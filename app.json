@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Liliw Market Connect",
+    "slug": "liliw-market-connect",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.liliw.marketconnect.vendor",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Allow Liliw Market Connect to access your photos for store logo and product pictures.",
+        "NSCameraUsageDescription": "Allow Liliw Market Connect to use the camera for store logo and product pictures."
+      }
+    },
+    "android": {
+      "package": "com.liliw.marketconnect.vendor",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
+    },
+    "scheme": "liliw-market",
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Liliw Market Connect to access your photos for store logo and product pictures.",
+          "cameraPermission": "Allow Liliw Market Connect to use the camera for store logo and product pictures."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#0050d8"
+        }
+      ]
+    ]
+  }
+}
