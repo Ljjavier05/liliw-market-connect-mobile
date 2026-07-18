@@ -8,18 +8,23 @@ import {
   TouchableOpacity,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { getPricingInsights } from '../../services/vendor.service';
 import usePolling from '../../hooks/usePolling';
 import EmptyState from '../../components/EmptyState';
 import LoadingScreen from '../../components/LoadingScreen';
-import { colors } from '../../theme/colors';
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  ChartBarIcon,
+  CheckIcon,
+} from '../../components/icons';
+import { useTheme } from '../../context/ThemeContext';
 
 function money(n) {
   return `₱${Number(n || 0).toFixed(2)}`;
 }
 
-function getStatus(row) {
+function getStatus(row, colors) {
   const min = Number(row.suggestedRange?.min ?? 0);
   const max = Number(row.suggestedRange?.max ?? 0);
   const price = Number(row.currentPrice ?? 0);
@@ -28,7 +33,7 @@ function getStatus(row) {
       key: 'LOW',
       label: 'Too low',
       hint: 'Consider raising your price',
-      icon: 'arrow-up',
+      icon: ArrowUpIcon,
       bg: colors.primaryLight,
       text: colors.primary,
     };
@@ -38,22 +43,24 @@ function getStatus(row) {
       key: 'HIGH',
       label: 'Too high',
       hint: 'Consider lowering your price',
-      icon: 'arrow-down',
-      bg: '#ffedd5',
-      text: '#c2410c',
+      icon: ArrowDownIcon,
+      bg: colors.warningSoft,
+      text: colors.warningDeep,
     };
   }
   return {
     key: 'GOOD',
     label: 'Good',
     hint: 'Within suggested range',
-    icon: 'checkmark',
+    icon: CheckIcon,
     bg: colors.successLight,
     text: colors.success,
   };
 }
 
 export default function PricingInsightsScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [insights, setInsights] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,9 +89,9 @@ export default function PricingInsightsScreen({ navigation }) {
     () =>
       insights.map((row) => ({
         ...row,
-        status: getStatus(row),
+        status: getStatus(row, colors),
       })),
-    [insights]
+    [insights, colors]
   );
 
   const counts = useMemo(
@@ -103,6 +110,7 @@ export default function PricingInsightsScreen({ navigation }) {
 
   const renderItem = ({ item }) => {
     const s = item.status;
+    const StatusIcon = s.icon;
     const diff = Number(item.currentPrice) - Number(item.marketAveragePrice);
     return (
       <View style={styles.card}>
@@ -112,7 +120,7 @@ export default function PricingInsightsScreen({ navigation }) {
             <Text style={styles.category}>{item.category || 'Uncategorized'}</Text>
           </View>
           <View style={[styles.badge, { backgroundColor: s.bg }]}>
-            <Ionicons name={s.icon} size={12} color={s.text} />
+            <StatusIcon size={12} color={s.text} />
             <Text style={[styles.badgeText, { color: s.text }]}>{s.label}</Text>
           </View>
         </View>
@@ -168,7 +176,7 @@ export default function PricingInsightsScreen({ navigation }) {
           <Text style={styles.summaryDot}>·</Text>
           <Text style={[styles.summaryText, { color: colors.primary }]}>{counts.low} too low</Text>
           <Text style={styles.summaryDot}>·</Text>
-          <Text style={[styles.summaryText, { color: '#c2410c' }]}>{counts.high} too high</Text>
+          <Text style={[styles.summaryText, { color: colors.warningDeep }]}>{counts.high} too high</Text>
         </View>
       </View>
 
@@ -212,7 +220,7 @@ export default function PricingInsightsScreen({ navigation }) {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="📊"
+            icon={ChartBarIcon}
             title={filter === 'ALL' ? 'No pricing insights yet' : 'No matching products'}
             subtitle="Add active products to see market price suggestions."
           />
@@ -233,95 +241,96 @@ export default function PricingInsightsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.gray50 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.pageBg },
 
-  intro: {
-    backgroundColor: colors.white,
-    marginHorizontal: 16,
-    marginTop: 12,
-    borderRadius: 14,
-    padding: 14,
-  },
-  introTitle: { fontSize: 16, fontWeight: '800', color: colors.gray900 },
-  introSub: { fontSize: 12, color: colors.gray500, marginTop: 4, lineHeight: 17 },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-  summaryText: { fontSize: 12, fontWeight: '700', color: colors.success },
-  summaryDot: { color: colors.gray300 },
+    intro: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      marginTop: 12,
+      borderRadius: 14,
+      padding: 14,
+    },
+    introTitle: { fontSize: 16, fontWeight: '800', color: colors.gray900 },
+    introSub: { fontSize: 12, color: colors.gray500, marginTop: 4, lineHeight: 17 },
+    summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
+    summaryText: { fontSize: 12, fontWeight: '700', color: colors.success },
+    summaryDot: { color: colors.gray300 },
 
-  filtersWrap: {
-    height: 52,
-    justifyContent: 'center',
-  },
-  filtersScroll: {
-    flexGrow: 0,
-  },
-  filters: {
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  filterChip: {
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.gray800,
-    lineHeight: 18,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-  filterTextActive: { color: colors.white },
+    filtersWrap: {
+      height: 52,
+      justifyContent: 'center',
+    },
+    filtersScroll: {
+      flexGrow: 0,
+    },
+    filters: {
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      flexDirection: 'row',
+    },
+    filterChip: {
+      height: 36,
+      paddingHorizontal: 14,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.gray300,
+      marginRight: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    filterChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    filterText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.gray800,
+      lineHeight: 18,
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    },
+    filterTextActive: { color: colors.white },
 
-  list: { padding: 16, gap: 10, paddingBottom: 40, flexGrow: 1 },
+    list: { padding: 16, gap: 10, paddingBottom: 40, flexGrow: 1 },
 
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 14,
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
-  productName: { fontSize: 15, fontWeight: '700', color: colors.gray900 },
-  category: { fontSize: 12, color: colors.gray400, marginTop: 2 },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  badgeText: { fontSize: 11, fontWeight: '700' },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 14,
+    },
+    cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 12 },
+    productName: { fontSize: 15, fontWeight: '700', color: colors.gray900 },
+    category: { fontSize: 12, color: colors.gray400, marginTop: 2 },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 20,
+    },
+    badgeText: { fontSize: 11, fontWeight: '700' },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap' },
-  gridItem: { width: '50%', marginBottom: 10 },
-  gridLabel: { fontSize: 11, color: colors.gray400, fontWeight: '600' },
-  gridValue: { fontSize: 14, fontWeight: '800', color: colors.gray900, marginTop: 2 },
+    grid: { flexDirection: 'row', flexWrap: 'wrap' },
+    gridItem: { width: '50%', marginBottom: 10 },
+    gridLabel: { fontSize: 11, color: colors.gray400, fontWeight: '600' },
+    gridValue: { fontSize: 14, fontWeight: '800', color: colors.gray900, marginTop: 2 },
 
-  rangeBox: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 2,
-  },
-  rangeLabel: { fontSize: 11, fontWeight: '700', color: colors.primary },
-  rangeValue: { fontSize: 14, fontWeight: '800', color: colors.primaryDark, marginTop: 2 },
-  hint: { fontSize: 12, color: colors.gray600, marginTop: 4 },
-  diff: { fontSize: 11, color: colors.gray500, marginTop: 4 },
+    rangeBox: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 10,
+      padding: 10,
+      marginTop: 2,
+    },
+    rangeLabel: { fontSize: 11, fontWeight: '700', color: colors.primary },
+    rangeValue: { fontSize: 14, fontWeight: '800', color: colors.primaryDark, marginTop: 2 },
+    hint: { fontSize: 12, color: colors.gray600, marginTop: 4 },
+    diff: { fontSize: 11, color: colors.gray500, marginTop: 4 },
 
-  manageBtn: { alignItems: 'center', paddingVertical: 12 },
-  manageBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
-});
+    manageBtn: { alignItems: 'center', paddingVertical: 12 },
+    manageBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  });

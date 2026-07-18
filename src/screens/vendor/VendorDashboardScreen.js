@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
+  Alert,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '../../context/AuthContext';
@@ -14,21 +15,32 @@ import {
   getMyRents,
   getMyViolations,
   getPricingInsights,
+  getPermitCompliance,
 } from '../../services/vendor.service';
 import Badge from '../../components/Badge';
 import StatCard from '../../components/StatCard';
 import LoadingScreen from '../../components/LoadingScreen';
 import StoreAvatar from '../../components/StoreAvatar';
 import { useAlertsOptional } from '../../context/AlertsContext';
-import { colors } from '../../theme/colors';
-import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
+import {
+  ArchiveBoxIcon,
+  BanknotesIcon,
+  BellIcon,
+  BoltIcon,
+  BuildingStorefrontIcon,
+  ChevronRightIcon,
+  DocumentIcon,
+  ClipboardDocumentIcon,
+  ExclamationTriangleIcon,
+} from '../../components/icons';
 
-function insightStatus(row) {
+function insightStatus(row, colors) {
   const min = Number(row.suggestedRange?.min ?? 0);
   const max = Number(row.suggestedRange?.max ?? 0);
   const price = Number(row.currentPrice ?? 0);
   if (price < min) return { label: 'Too low', bg: colors.primaryLight, text: colors.primary };
-  if (price > max) return { label: 'Too high', bg: '#ffedd5', text: '#c2410c' };
+  if (price > max) return { label: 'Too high', bg: colors.warningSoft, text: colors.warningDeep };
   return { label: 'Good', bg: colors.successLight, text: colors.success };
 }
 
@@ -40,33 +52,37 @@ function greetingForHour(hour) {
 
 export default function VendorDashboardScreen({ navigation }) {
   const { user, logout } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const alertsCtx = useAlertsOptional();
   const [vendor, setVendor] = useState(null);
   const [rents, setRents] = useState([]);
   const [violations, setViolations] = useState([]);
   const [insights, setInsights] = useState([]);
+  const [compliance, setCompliance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loginWarnShown, setLoginWarnShown] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [v, r, vi, pi] = await Promise.all([
+      const [v, r, vi, pi, c] = await Promise.all([
         getMyVendor(),
         getMyRents().catch(() => []),
         getMyViolations().catch(() => []),
         getPricingInsights().catch(() => []),
+        getPermitCompliance().catch(() => null),
       ]);
-      // null = confirmed no vendor profile (404). Keep previous on unexpected errors.
       setVendor(v);
       setRents(r);
       setViolations(vi);
       setInsights(Array.isArray(pi) ? pi : []);
+      setCompliance(c);
     } catch (err) {
       if (err?.response?.data?.code === 'ACCOUNT_DEACTIVATED') {
         await logout();
         return;
       }
-      // Do not clear vendor — avoids "Set up your store" flash when account status changes
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -78,6 +94,27 @@ export default function VendorDashboardScreen({ navigation }) {
     useCallback(() => {
       fetchData();
     }, [fetchData])
+  );
+
+  // Show 30-day / expired warning once per session when vendor lands on dashboard after login
+  useFocusEffect(
+    useCallback(() => {
+      if (loginWarnShown || !compliance) return undefined;
+      const msg = compliance.banner?.message || compliance.warning?.message;
+      if (!msg) return undefined;
+      setLoginWarnShown(true);
+      const title = compliance.banner?.title || compliance.warning?.title || 'Business Permit';
+      const timer = setTimeout(() => {
+        Alert.alert(title, msg, [
+          { text: 'Later', style: 'cancel' },
+          {
+            text: 'Renew Permit',
+            onPress: () => navigation.navigate('BusinessPermit'),
+          },
+        ]);
+      }, 400);
+      return () => clearTimeout(timer);
+    }, [compliance, loginWarnShown, navigation])
   );
 
   const onRefresh = () => {
@@ -121,17 +158,57 @@ export default function VendorDashboardScreen({ navigation }) {
           activeOpacity={0.85}
         >
           <View style={styles.alertsBannerIcon}>
-            <Ionicons name="notifications" size={18} color={colors.primary} />
+            <BellIcon size={18} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.alertsBannerTitle}>
               {alertsCtx.unreadCount} new alert{alertsCtx.unreadCount > 1 ? 's' : ''}
             </Text>
             <Text style={styles.alertsBannerSub}>
-              Tap to review violations, rent, and stock warnings
+              Tap to review SMS, rent, utilities, and stock
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.primary} />
+          <ChevronRightIcon size={18} color={colors.primary} />
+        </TouchableOpacity>
+      ) : null}
+
+      {compliance?.banner ? (
+        <TouchableOpacity
+          style={[styles.alertsBanner, styles.permitExpiredBanner]}
+          onPress={() => navigation.navigate('BusinessPermit')}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.alertsBannerIcon, { backgroundColor: colors.dangerLight || '#FEE2E2' }]}>
+            <ExclamationTriangleIcon size={18} color={colors.danger} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.alertsBannerTitle, { color: colors.danger }]}>
+              {compliance.banner.title}
+            </Text>
+            <Text style={[styles.alertsBannerSub, { color: colors.danger }]}>
+              {compliance.banner.message}
+            </Text>
+          </View>
+          <ChevronRightIcon size={18} color={colors.danger} />
+        </TouchableOpacity>
+      ) : null}
+
+      {compliance?.warning && !compliance?.banner ? (
+        <TouchableOpacity
+          style={[styles.alertsBanner, styles.permitWarnBanner]}
+          onPress={() => navigation.navigate('BusinessPermit')}
+          activeOpacity={0.85}
+        >
+          <View style={[styles.alertsBannerIcon, { backgroundColor: colors.warningLight }]}>
+            <ExclamationTriangleIcon size={18} color={colors.warning} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.alertsBannerTitle, { color: colors.warningDeep || colors.warning }]}>
+              {compliance.warning.title}
+            </Text>
+            <Text style={styles.alertsBannerSub}>{compliance.warning.message}</Text>
+          </View>
+          <ChevronRightIcon size={18} color={colors.warning} />
         </TouchableOpacity>
       ) : null}
 
@@ -141,16 +218,19 @@ export default function VendorDashboardScreen({ navigation }) {
           onPress={() => navigation.navigate('TabProfile')}
           activeOpacity={0.85}
         >
-          <Text style={styles.setupIcon}>🏪</Text>
+          <BuildingStorefrontIcon size={48} color={colors.white} style={styles.setupIcon} />
           <Text style={styles.setupTitle}>Set up your store</Text>
           <Text style={styles.setupSub}>
-            Submit your vendor application to start selling at Liliw Public Market.
+            Submit your vendor application with store details and documents. Admin will verify
+            everything before your store unlocks for editing.
           </Text>
           <View style={styles.setupBtn}>
             <Text style={styles.setupBtnText}>Go to Profile →</Text>
           </View>
         </TouchableOpacity>
-      ) : (
+      ) : null}
+
+      {vendor ? (
         <>
           <View style={styles.storeCard}>
             <View style={styles.storeRow}>
@@ -178,7 +258,7 @@ export default function VendorDashboardScreen({ navigation }) {
             {vendor.status === 'PENDING' ? (
               <View style={styles.alertBox}>
                 <Text style={styles.alertText}>
-                  Your application is pending admin approval. You will get an SMS once reviewed.
+                  Your application is pending admin approval. You can view your submitted store details in Profile; editing unlocks after approval.
                 </Text>
               </View>
             ) : null}
@@ -235,13 +315,13 @@ export default function VendorDashboardScreen({ navigation }) {
               <Text style={styles.sectionTitle}>Store overview</Text>
               <View style={styles.statsRow}>
                 <StatCard
-                  icon="📦"
+                  icon={ArchiveBoxIcon}
                   label="Active products"
                   value={activeProducts}
                   color={colors.primary}
                 />
                 <StatCard
-                  icon="⚠️"
+                  icon={ExclamationTriangleIcon}
                   label="Low stock"
                   value={lowStock.length}
                   color={lowStock.length ? colors.danger : colors.gray400}
@@ -249,13 +329,13 @@ export default function VendorDashboardScreen({ navigation }) {
               </View>
               <View style={styles.statsRow}>
                 <StatCard
-                  icon="💰"
+                  icon={BanknotesIcon}
                   label="Rent due"
                   value={totalDue > 0 ? `₱${totalDue.toLocaleString()}` : '0'}
                   color={totalDue > 0 ? colors.warning : colors.success}
                 />
                 <StatCard
-                  icon="🚨"
+                  icon={ExclamationTriangleIcon}
                   label="Open violations"
                   value={openViolations.length}
                   color={openViolations.length ? colors.danger : colors.success}
@@ -325,6 +405,55 @@ export default function VendorDashboardScreen({ navigation }) {
               ) : null}
 
               <View style={styles.panel}>
+                <Text style={[styles.panelTitle, { marginBottom: 4 }]}>Market desk</Text>
+                <TouchableOpacity
+                  style={[styles.quickLink, { borderTopWidth: 0 }]}
+                  onPress={() => navigation.navigate('AvailableStalls')}
+                  activeOpacity={0.85}
+                >
+                  <BuildingStorefrontIcon size={18} color={colors.primary} />
+                  <Text style={styles.quickLinkText}>Available Stalls</Text>
+                  <ChevronRightIcon size={16} color={colors.gray300} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickLink}
+                  onPress={() => navigation.navigate('TabRents')}
+                  activeOpacity={0.85}
+                >
+                  <BanknotesIcon size={18} color={colors.primary} />
+                  <Text style={styles.quickLinkText}>Stall Rent</Text>
+                  <ChevronRightIcon size={16} color={colors.gray300} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickLink}
+                  onPress={() => navigation.navigate('UtilityBills')}
+                  activeOpacity={0.85}
+                >
+                  <BoltIcon size={18} color={colors.primary} />
+                  <Text style={styles.quickLinkText}>Water & Electricity</Text>
+                  <ChevronRightIcon size={16} color={colors.gray300} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickLink}
+                  onPress={() => navigation.navigate('BusinessPermit')}
+                  activeOpacity={0.85}
+                >
+                  <DocumentIcon size={18} color={colors.primary} />
+                  <Text style={styles.quickLinkText}>Business Permit</Text>
+                  <ChevronRightIcon size={16} color={colors.gray300} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickLink}
+                  onPress={() => navigation.navigate('BusinessPermitApplication')}
+                  activeOpacity={0.85}
+                >
+                  <ClipboardDocumentIcon size={18} color={colors.primary} />
+                  <Text style={styles.quickLinkText}>Business Permit Application</Text>
+                  <ChevronRightIcon size={16} color={colors.gray300} />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.panel}>
                 <View style={styles.panelHeader}>
                   <View>
                     <Text style={styles.panelTitle}>Price Watch</Text>
@@ -341,7 +470,7 @@ export default function VendorDashboardScreen({ navigation }) {
                   </Text>
                 ) : (
                   insights.slice(0, 4).map((row) => {
-                    const status = insightStatus(row);
+                    const status = insightStatus(row, colors);
                     return (
                       <TouchableOpacity
                         key={row.productId}
@@ -378,135 +507,155 @@ export default function VendorDashboardScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.gray50 },
-  content: { padding: 20, paddingBottom: 40 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.pageBg },
+    content: { padding: 20, paddingBottom: 40 },
 
-  header: { marginBottom: 16, paddingTop: 4 },
-  greeting: { fontSize: 13, color: colors.gray400 },
-  name: { fontSize: 22, fontWeight: '800', color: colors.gray900 },
+    header: { marginBottom: 16, paddingTop: 4 },
+    greeting: { fontSize: 13, color: colors.gray400 },
+    name: { fontSize: 22, fontWeight: '800', color: colors.gray900 },
 
-  alertsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: colors.primaryLight,
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 14,
-  },
-  alertsBannerIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  alertsBannerTitle: { fontSize: 13, fontWeight: '800', color: colors.primary },
-  alertsBannerSub: { fontSize: 11, color: colors.primaryDark, marginTop: 1 },
+    alertsBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: colors.primaryLight,
+      borderRadius: 14,
+      padding: 12,
+      marginBottom: 14,
+    },
+    alertsBannerIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    alertsBannerTitle: { fontSize: 13, fontWeight: '800', color: colors.primary },
+    alertsBannerSub: { fontSize: 11, color: colors.primaryDark, marginTop: 1 },
+    permitExpiredBanner: {
+      backgroundColor: colors.dangerLight || '#FEE2E2',
+      borderWidth: 1,
+      borderColor: colors.danger,
+    },
+    permitWarnBanner: {
+      backgroundColor: colors.warningLight,
+      borderWidth: 1,
+      borderColor: colors.warning,
+    },
 
-  setupCard: {
-    backgroundColor: colors.primary,
-    borderRadius: 18,
-    padding: 28,
-    alignItems: 'center',
-  },
-  setupIcon: { fontSize: 48, marginBottom: 12 },
-  setupTitle: { fontSize: 18, fontWeight: '800', color: colors.white, marginBottom: 6 },
-  setupSub: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)',
-    textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 18,
-  },
-  setupBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  setupBtnText: { color: colors.white, fontWeight: '700', fontSize: 14 },
+    setupCard: {
+      backgroundColor: colors.primary,
+      borderRadius: 18,
+      padding: 28,
+      alignItems: 'center',
+    },
+    setupIcon: { marginBottom: 12 },
+    setupTitle: { fontSize: 18, fontWeight: '800', color: colors.white, marginBottom: 6 },
+    setupSub: {
+      fontSize: 13,
+      color: 'rgba(255,255,255,0.8)',
+      textAlign: 'center',
+      marginBottom: 20,
+      lineHeight: 18,
+    },
+    setupBtn: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 10,
+    },
+    setupBtnText: { color: colors.white, fontWeight: '700', fontSize: 14 },
 
-  storeCard: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-  },
-  storeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  storeInfo: { flex: 1 },
-  storeName: { fontSize: 16, fontWeight: '700', color: colors.gray900 },
-  storeMeta: { fontSize: 12, color: colors.gray400, marginTop: 2 },
+    storeCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+    },
+    storeRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    storeInfo: { flex: 1 },
+    storeName: { fontSize: 16, fontWeight: '700', color: colors.gray900 },
+    storeMeta: { fontSize: 12, color: colors.gray400, marginTop: 2 },
 
-  alertBox: {
-    marginTop: 12,
-    backgroundColor: colors.warningLight,
-    borderRadius: 8,
-    padding: 10,
-  },
-  alertDanger: { backgroundColor: colors.dangerLight },
-  alertText: { fontSize: 13, color: colors.warning, fontWeight: '500', lineHeight: 18 },
-  alertTextDanger: { color: colors.danger },
+    alertBox: {
+      marginTop: 12,
+      backgroundColor: colors.warningLight,
+      borderRadius: 8,
+      padding: 10,
+    },
+    alertDanger: { backgroundColor: colors.dangerLight },
+    alertText: { fontSize: 13, color: colors.warning, fontWeight: '500', lineHeight: 18 },
+    alertTextDanger: { color: colors.danger },
 
-  urgentCard: {
-    backgroundColor: '#fff7ed',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
-  },
-  urgentTitle: { fontSize: 13, fontWeight: '800', color: colors.warning, marginBottom: 6 },
-  urgentItem: { fontSize: 13, color: colors.gray700, paddingVertical: 3, fontWeight: '600' },
+    urgentCard: {
+      backgroundColor: colors.orangeSoft,
+      borderRadius: 14,
+      padding: 14,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.warningBorder,
+    },
+    urgentTitle: { fontSize: 13, fontWeight: '800', color: colors.warning, marginBottom: 6 },
+    urgentItem: { fontSize: 13, color: colors.gray700, paddingVertical: 3, fontWeight: '600' },
 
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.gray700, marginBottom: 12 },
-  statsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+    sectionTitle: { fontSize: 15, fontWeight: '700', color: colors.gray700, marginBottom: 12 },
+    statsRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
 
-  lowStockCard: {
-    backgroundColor: '#fff5f5',
-    borderRadius: 14,
-    padding: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.danger,
-    marginBottom: 16,
-  },
-  lowStockTitle: { fontSize: 14, fontWeight: '700', color: colors.danger, marginBottom: 10 },
-  lowStockRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  lowStockName: { fontSize: 13, color: colors.gray700, flex: 1, marginRight: 8 },
-  lowStockQty: { fontSize: 13, fontWeight: '700', color: colors.danger },
+    lowStockCard: {
+      backgroundColor: colors.redWash,
+      borderRadius: 14,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: colors.dangerBorder,
+      marginBottom: 16,
+    },
+    lowStockTitle: { fontSize: 14, fontWeight: '700', color: colors.danger, marginBottom: 10 },
+    lowStockRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      paddingVertical: 4,
+    },
+    lowStockName: { fontSize: 13, color: colors.gray700, flex: 1, marginRight: 8 },
+    lowStockQty: { fontSize: 13, fontWeight: '700', color: colors.danger },
 
-  panel: {
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 16,
-  },
-  panelHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  panelTitle: { fontSize: 14, fontWeight: '700', color: colors.gray800 },
-  panelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.gray100,
-  },
-  panelRowTitle: { fontSize: 13, fontWeight: '600', color: colors.gray800 },
-  panelRowSub: { fontSize: 11, color: colors.gray400, marginTop: 2 },
-  panelAmount: { fontSize: 13, fontWeight: '700', color: colors.gray800 },
-  seeAll: { fontSize: 12, fontWeight: '700', color: colors.primary },
-  rangeHint: { fontSize: 11, color: colors.primary, marginTop: 2, fontWeight: '600' },
-  insightBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-  insightBadgeText: { fontSize: 11, fontWeight: '700' },
-});
+    panel: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      marginBottom: 16,
+    },
+    panelHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    panelTitle: { fontSize: 14, fontWeight: '700', color: colors.gray800 },
+    quickLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.gray100,
+    },
+    quickLinkText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.primary },
+    panelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 8,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.gray100,
+    },
+    panelRowTitle: { fontSize: 13, fontWeight: '600', color: colors.gray800 },
+    panelRowSub: { fontSize: 11, color: colors.gray400, marginTop: 2 },
+    panelAmount: { fontSize: 13, fontWeight: '700', color: colors.gray800 },
+    seeAll: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    rangeHint: { fontSize: 11, color: colors.primary, marginTop: 2, fontWeight: '600' },
+    insightBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
+    insightBadgeText: { fontSize: 11, fontWeight: '700' },
+  });

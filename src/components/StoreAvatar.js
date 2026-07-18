@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 import { uploadUrl } from '../utils/media';
-import { colors } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
 
 /**
  * Shows store logo when reachable; falls back to initials on error.
@@ -14,6 +14,8 @@ export default function StoreAvatar({
   cacheKey,
   style,
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [failed, setFailed] = useState(false);
   const [retry, setRetry] = useState(0);
   const bust = cacheKey || logo || '';
@@ -57,22 +59,23 @@ export default function StoreAvatar({
   );
 }
 
-const styles = StyleSheet.create({
-  image: {
-    backgroundColor: colors.gray100,
-    overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.gray200,
-  },
-  fallback: {
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: colors.gray200,
-  },
-  fallbackText: {
-    fontWeight: '800',
-    color: colors.primary,
-  },
-});
+const createStyles = (colors) =>
+  StyleSheet.create({
+    image: {
+      backgroundColor: colors.gray100,
+      overflow: 'hidden',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.gray200,
+    },
+    fallback: {
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.gray200,
+    },
+    fallbackText: {
+      fontWeight: '800',
+      color: colors.primary,
+    },
+  });

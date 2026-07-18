@@ -9,8 +9,25 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../../theme/colors';
+import {
+  ArchiveBoxIcon,
+  BanknotesIcon,
+  BoltIcon,
+  BuildingStorefrontIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  DevicePhoneMobileIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  FlagIcon,
+  LifebuoyIcon,
+  MapPinIcon,
+  MinusIcon,
+  PhoneIcon,
+  PlusIcon,
+  Squares2X2Icon,
+} from '../../components/icons';
+import { useTheme } from '../../context/ThemeContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -23,7 +40,15 @@ const FAQS = [
   },
   {
     q: 'How do I pay my stall rent?',
-    a: 'Visit the Liliw Public Market office to pay your rent in person. The administrator will then update your payment status in the system.',
+    a: 'Open Stall Rent in the app. Send the exact amount to the Market Office GCash number shown there, then upload your receipt for office confirmation.',
+  },
+  {
+    q: 'How do I request a stall?',
+    a: 'Pick your preferred open stall on Available Stalls after your store is approved (or during application). The market office reviews requests and assigns the stall.',
+  },
+  {
+    q: 'How do I pay water or electricity?',
+    a: 'Open Water & Electricity from Stall Rent or the Dashboard. Pay via Market Office GCash, then upload your receipt for confirmation.',
   },
   {
     q: 'What happens if my rent is overdue?',
@@ -65,23 +90,25 @@ const REMINDERS = [
 ];
 
 const QUICK_LINKS = [
-  { label: 'Store Profile', target: 'TabProfile', icon: 'storefront-outline' },
-  { label: 'My Products', target: 'TabProducts', icon: 'cube-outline' },
-  { label: 'Stall Rent', target: 'TabRents', icon: 'cash-outline' },
-  { label: 'Violations', target: 'TabViolations', icon: 'warning-outline' },
-  { label: 'Dashboard', target: 'TabDashboard', icon: 'grid-outline' },
+  { label: 'Store Profile', target: 'TabProfile', icon: BuildingStorefrontIcon },
+  { label: 'Available Stalls', target: 'AvailableStalls', icon: BuildingStorefrontIcon, nested: true },
+  { label: 'My Products', target: 'TabProducts', icon: ArchiveBoxIcon },
+  { label: 'Stall Rent', target: 'TabRents', icon: BanknotesIcon },
+  { label: 'Water & Electricity', target: 'UtilityBills', icon: BoltIcon, nested: true },
+  { label: 'Violations', target: 'TabViolations', icon: ExclamationTriangleIcon },
+  { label: 'Dashboard', target: 'TabDashboard', icon: Squares2X2Icon },
 ];
 
-function FaqItem({ item, open, onToggle }) {
+function FaqItem({ item, open, onToggle, styles, colors }) {
   return (
     <View style={styles.faqItem}>
       <TouchableOpacity style={styles.faqHeader} onPress={onToggle} activeOpacity={0.8}>
         <Text style={styles.faqQ}>{item.q}</Text>
-        <Ionicons
-          name={open ? 'remove' : 'add'}
-          size={20}
-          color={open ? colors.primary : colors.gray400}
-        />
+        {open ? (
+          <MinusIcon size={20} color={colors.primary} />
+        ) : (
+          <PlusIcon size={20} color={colors.gray400} />
+        )}
       </TouchableOpacity>
       {open ? <Text style={styles.faqA}>{item.a}</Text> : null}
     </View>
@@ -89,6 +116,8 @@ function FaqItem({ item, open, onToggle }) {
 }
 
 export default function VendorHelpCenterScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [openIndex, setOpenIndex] = useState(0);
   const [filter, setFilter] = useState('ALL');
 
@@ -110,7 +139,11 @@ export default function VendorHelpCenterScreen({ navigation }) {
     setOpenIndex((prev) => (prev === index ? -1 : index));
   };
 
-  const go = (target) => {
+  const go = (target, nested) => {
+    if (nested) {
+      navigation.navigate(target);
+      return;
+    }
     const parent = navigation.getParent();
     if (parent) parent.navigate(target);
     else navigation.navigate(target);
@@ -124,7 +157,7 @@ export default function VendorHelpCenterScreen({ navigation }) {
     >
       <View style={styles.hero}>
         <View style={styles.heroIcon}>
-          <Ionicons name="help-buoy-outline" size={26} color={colors.primary} />
+          <LifebuoyIcon size={26} color={colors.primary} />
         </View>
         <Text style={styles.heroTitle}>Support / Help Center</Text>
         <Text style={styles.heroSub}>
@@ -135,7 +168,7 @@ export default function VendorHelpCenterScreen({ navigation }) {
       <View style={styles.card}>
         <View style={styles.cardHead}>
           <View style={[styles.miniIcon, { backgroundColor: colors.primaryLight }]}>
-            <Ionicons name="call-outline" size={18} color={colors.primary} />
+            <PhoneIcon size={18} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Contact Admin</Text>
@@ -143,23 +176,23 @@ export default function VendorHelpCenterScreen({ navigation }) {
           </View>
         </View>
         <View style={styles.infoRow}>
-          <Ionicons name="location-outline" size={16} color={colors.primary} />
+          <MapPinIcon size={16} color={colors.primary} />
           <Text style={styles.infoText}>Liliw Public Market Office</Text>
         </View>
         <View style={styles.infoRow}>
-          <Ionicons name="time-outline" size={16} color={colors.primary} />
+          <ClockIcon size={16} color={colors.primary} />
           <Text style={styles.infoText}>Monday – Saturday, 8:00 AM – 5:00 PM</Text>
         </View>
         <View style={styles.infoRow}>
-          <Ionicons name="phone-portrait-outline" size={16} color={colors.primary} />
+          <DevicePhoneMobileIcon size={16} color={colors.primary} />
           <Text style={styles.infoText}>Contact the market administrator directly</Text>
         </View>
       </View>
 
-      <View style={[styles.card, styles.cardOrange]}>
+      <View style={[styles.card, styles.cardWarn]}>
         <View style={styles.cardHead}>
-          <View style={[styles.miniIcon, { backgroundColor: '#ffedd5' }]}>
-            <Ionicons name="flag-outline" size={18} color="#c2410c" />
+          <View style={[styles.miniIcon, { backgroundColor: colors.warningSoft }]}>
+            <FlagIcon size={18} color={colors.warningDeep} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Report an Issue</Text>
@@ -175,18 +208,21 @@ export default function VendorHelpCenterScreen({ navigation }) {
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Quick Links</Text>
-        {QUICK_LINKS.map((link) => (
-          <TouchableOpacity
-            key={link.target}
-            style={styles.quickLink}
-            onPress={() => go(link.target)}
-            activeOpacity={0.8}
-          >
-            <Ionicons name={link.icon} size={18} color={colors.primary} />
-            <Text style={styles.quickLinkText}>{link.label}</Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.gray300} />
-          </TouchableOpacity>
-        ))}
+        {QUICK_LINKS.map((link) => {
+          const LinkIcon = link.icon;
+          return (
+            <TouchableOpacity
+              key={link.target}
+              style={styles.quickLink}
+              onPress={() => go(link.target, link.nested)}
+              activeOpacity={0.8}
+            >
+              <LinkIcon size={18} color={colors.primary} />
+              <Text style={styles.quickLinkText}>{link.label}</Text>
+              <ChevronRightIcon size={16} color={colors.gray300} />
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <View style={styles.card}>
@@ -224,13 +260,15 @@ export default function VendorHelpCenterScreen({ navigation }) {
             item={item}
             open={openIndex === index}
             onToggle={() => toggle(index)}
+            styles={styles}
+            colors={colors}
           />
         ))}
       </View>
 
       <View style={styles.reminders}>
         <View style={styles.cardHead}>
-          <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+          <DocumentTextIcon size={18} color={colors.primary} />
           <Text style={[styles.sectionTitle, { marginBottom: 0 }]}>Market Reminders</Text>
         </View>
         {REMINDERS.map((line) => (
@@ -243,109 +281,113 @@ export default function VendorHelpCenterScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.gray50 },
-  content: { padding: 16, paddingBottom: 40 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.pageBg },
+    content: { padding: 16, paddingBottom: 40 },
 
-  hero: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    alignItems: 'flex-start',
-  },
-  heroIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  heroTitle: { fontSize: 18, fontWeight: '800', color: colors.gray900 },
-  heroSub: { fontSize: 13, color: colors.gray500, marginTop: 4, lineHeight: 18 },
+    hero: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      alignItems: 'flex-start',
+    },
+    heroIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+    },
+    heroTitle: { fontSize: 18, fontWeight: '800', color: colors.gray900 },
+    heroSub: { fontSize: 13, color: colors.gray500, marginTop: 4, lineHeight: 18 },
 
-  card: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 14,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.primary,
-  },
-  cardOrange: { borderLeftColor: '#fb923c' },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  miniIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardTitle: { fontSize: 15, fontWeight: '800', color: colors.gray900 },
-  cardSub: { fontSize: 12, color: colors.gray400, marginTop: 1 },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+    },
+    cardWarn: {
+      borderColor: colors.warningBorder,
+      backgroundColor: colors.orangeSoft,
+    },
+    cardHead: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+    miniIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardTitle: { fontSize: 15, fontWeight: '800', color: colors.gray900 },
+    cardSub: { fontSize: 12, color: colors.gray400, marginTop: 1 },
 
-  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  infoText: { fontSize: 13, color: colors.gray600, flex: 1, lineHeight: 18 },
-  bullet: { fontSize: 13, color: colors.gray600, marginTop: 4 },
-  reportNote: {
-    marginTop: 10,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#c2410c',
-  },
+    infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
+    infoText: { fontSize: 13, color: colors.gray600, flex: 1, lineHeight: 18 },
+    bullet: { fontSize: 13, color: colors.gray600, marginTop: 4 },
+    reportNote: {
+      marginTop: 10,
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.warningDeep,
+    },
 
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.gray900,
-    marginBottom: 10,
-  },
-  quickLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.gray100,
-  },
-  quickLinkText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.primary },
+    sectionTitle: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.gray900,
+      marginBottom: 10,
+    },
+    quickLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.gray100,
+    },
+    quickLinkText: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.primary },
 
-  filters: { gap: 8, marginBottom: 8 },
-  filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: colors.gray50,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-    marginRight: 8,
-  },
-  filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { fontSize: 12, fontWeight: '700', color: colors.gray500 },
-  filterTextActive: { color: colors.white },
+    filters: { gap: 8, marginBottom: 8 },
+    filterChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: colors.gray50,
+      borderWidth: 1,
+      borderColor: colors.gray200,
+      marginRight: 8,
+    },
+    filterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    filterText: { fontSize: 12, fontWeight: '700', color: colors.gray500 },
+    filterTextActive: { color: colors.white },
 
-  faqItem: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.gray100,
-    paddingVertical: 12,
-  },
-  faqHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  faqQ: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.gray800, lineHeight: 18 },
-  faqA: { marginTop: 8, fontSize: 13, color: colors.gray500, lineHeight: 19 },
+    faqItem: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.gray100,
+      paddingVertical: 12,
+    },
+    faqHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    faqQ: { flex: 1, fontSize: 13, fontWeight: '700', color: colors.gray800, lineHeight: 18 },
+    faqA: { marginTop: 8, fontSize: 13, color: colors.gray500, lineHeight: 19 },
 
-  reminders: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  reminderLine: {
-    fontSize: 13,
-    color: colors.primaryDark,
-    lineHeight: 20,
-    marginTop: 6,
-  },
-});
+    reminders: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.primarySoft,
+    },
+    reminderLine: {
+      fontSize: 13,
+      color: colors.primaryDark,
+      lineHeight: 20,
+      marginTop: 6,
+    },
+  });

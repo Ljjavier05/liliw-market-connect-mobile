@@ -1,19 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   TouchableOpacity,
   Alert,
   Image,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
-import { colors } from '../../theme/colors';
+import FormScreen from '../../components/FormScreen';
 import { API_BASE_URL } from '../../config/env';
 
 const brandLogo = require('../../../assets/liliw-seal.png');
@@ -39,6 +37,8 @@ function getErrorMessage(err) {
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -50,8 +50,12 @@ export default function LoginScreen({ navigation }) {
 
   const validate = () => {
     const e = {};
-    if (!form.email.trim()) e.email = 'Email is required';
-    else if (!/\S+@\S+\.\S+/.test(form.email)) e.email = 'Enter a valid email';
+    const id = form.email.trim();
+    const digits = id.replace(/\D/g, '');
+    const isPhone = /^09\d{9}$/.test(digits) || /^639\d{9}$/.test(digits);
+    const isEmail = /\S+@\S+\.\S+/.test(id);
+    if (!id) e.email = 'Email or mobile number is required';
+    else if (!isPhone && !isEmail) e.email = 'Enter a valid email or PH mobile';
     if (!form.password) e.password = 'Password is required';
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -74,15 +78,7 @@ export default function LoginScreen({ navigation }) {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
+    <FormScreen backgroundColor={colors.primaryLight} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.logoWrap}>
             <Image source={brandLogo} style={styles.logoImage} resizeMode="cover" />
@@ -96,11 +92,12 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.subtitle}>Sign in with your vendor account</Text>
 
           <Input
-            label="Email"
-            placeholder="vendor@example.com"
-            keyboardType="email-address"
-            textContentType="emailAddress"
-            autoComplete="email"
+            label="Email or mobile"
+            placeholder="email@example.com or 09171234567"
+            keyboardType="default"
+            textContentType="username"
+            autoComplete="username"
+            autoCapitalize="none"
             value={form.email}
             onChangeText={(v) => set('email', v)}
             error={errors.email}
@@ -133,56 +130,57 @@ export default function LoginScreen({ navigation }) {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </FormScreen>
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.primaryLight },
-  scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+    scroll: { flexGrow: 1, paddingHorizontal: 24, paddingBottom: 40 },
 
-  header: { alignItems: 'center', paddingTop: 72, paddingBottom: 32 },
-  logoWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: colors.white,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  logoImage: { width: '100%', height: '100%' },
-  appName: { fontSize: 20, fontWeight: '800', color: colors.gray900, marginBottom: 4 },
-  tagline: { fontSize: 13, color: colors.gray500, textAlign: 'center' },
+    header: { alignItems: 'center', paddingTop: 72, paddingBottom: 32 },
+    logoWrap: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 14,
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: colors.surface,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.25,
+      shadowRadius: 12,
+      elevation: 8,
+    },
+    logoImage: { width: '100%', height: '100%' },
+    appName: { fontSize: 20, fontWeight: '800', color: colors.ink, marginBottom: 4 },
+    tagline: { fontSize: 13, color: colors.inkMuted, textAlign: 'center' },
 
-  form: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 24,
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  title: { fontSize: 22, fontWeight: '800', color: colors.gray900, marginBottom: 4 },
-  subtitle: { fontSize: 14, color: colors.gray400, marginBottom: 24 },
+    form: {
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+      shadowColor: colors.shadowBrand,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      elevation: 4,
+    },
+    title: { fontSize: 22, fontWeight: '800', color: colors.ink, marginBottom: 4 },
+    subtitle: { fontSize: 14, color: colors.inkMuted, marginBottom: 24 },
 
-  forgotWrap: { alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 },
-  forgot: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+    forgotWrap: { alignSelf: 'flex-end', marginBottom: 8, marginTop: -4 },
+    forgot: { fontSize: 13, color: colors.primary, fontWeight: '600' },
 
-  btn: { marginTop: 4 },
+    btn: { marginTop: 4 },
 
-  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
-  footerText: { fontSize: 14, color: colors.gray500 },
-  link: { fontSize: 14, color: colors.primary, fontWeight: '700' },
-});
+    footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
+    footerText: { fontSize: 14, color: colors.gray500 },
+    link: { fontSize: 14, color: colors.primary, fontWeight: '700' },
+  });

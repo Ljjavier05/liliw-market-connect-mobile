@@ -10,22 +10,25 @@ export async function login(email, password) {
   return res.data;
 }
 
-/**
- * Register a VENDOR account.
- * Backend requires confirmPassword — always send it.
- */
-export async function register({ name, email, password, confirmPassword, phone, address }) {
-  const res = await api.post('/auth/register', {
-    name,
-    email,
-    password,
-    confirmPassword,
-    phone: phone || undefined,
-    address: address || undefined,
+/** Step 1: send registration OTP via Email or SMS */
+export async function registerSendOtp(payload) {
+  const res = await api.post('/auth/register/send-otp', {
+    ...payload,
     role: 'VENDOR',
+    channel: payload.channel === 'EMAIL' ? 'EMAIL' : 'SMS',
   });
-  await setStoredToken(res.data.token);
   return res.data;
+}
+
+/** Step 2: verify OTP and create account (no auto-login) */
+export async function registerVerify(payload) {
+  const res = await api.post('/auth/register/verify', payload);
+  return res.data;
+}
+
+/** @deprecated Use registerSendOtp + registerVerify */
+export async function register(payload) {
+  return registerSendOtp(payload);
 }
 
 export async function getMe() {
@@ -38,8 +41,15 @@ export async function logout() {
   await clearStoredToken();
 }
 
-export async function forgotPassword(email) {
-  const res = await api.post('/auth/forgot-password', { email });
+export async function forgotPassword(email, channel = 'SMS', phone) {
+  const body = {
+    email,
+    channel: channel === 'EMAIL' ? 'EMAIL' : 'SMS',
+  };
+  if (body.channel === 'SMS' && phone) {
+    body.phone = phone;
+  }
+  const res = await api.post('/auth/forgot-password', body);
   return res.data;
 }
 

@@ -1,51 +1,63 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../theme/colors';
+import { radii } from '../theme/colors';
+import { useTheme } from '../context/ThemeContext';
+import { ArchiveBoxIcon } from './icons';
 
-export default function StatCard({ icon, label, value, color = colors.primary }) {
+export default function StatCard({
+  icon: Icon = ArchiveBoxIcon,
+  label,
+  value,
+  color,
+}) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  const tint = color || colors.primary;
   return (
     <View style={styles.card}>
-      <View style={[styles.iconWrap, { backgroundColor: `${color}18` }]}>
-        <Text style={styles.icon}>{icon}</Text>
+      <View style={[styles.iconWrap, { backgroundColor: `${tint}18` }]}>
+        <Icon size={20} color={tint} />
       </View>
-      <Text style={[styles.value, { color }]}>{value ?? '—'}</Text>
+      <Text style={[styles.value, { color: tint }]}>{value ?? '—'}</Text>
       <Text style={styles.label}>{label}</Text>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: 14,
-    padding: 14,
-    alignItems: 'center',
-    shadowColor: colors.black,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-    minWidth: 90,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  icon: { fontSize: 20 },
-  value: {
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  label: {
-    fontSize: 11,
-    color: colors.gray500,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-});
+const createStyles = (colors) =>
+  StyleSheet.create({
+    card: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: radii.lg,
+      padding: 14,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+      shadowColor: colors.shadowBrand,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+      minWidth: 90,
+    },
+    iconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    value: {
+      fontSize: 20,
+      fontWeight: '800',
+      marginBottom: 2,
+    },
+    label: {
+      fontSize: 11,
+      color: colors.inkMuted,
+      textAlign: 'center',
+      fontWeight: '500',
+    },
+  });

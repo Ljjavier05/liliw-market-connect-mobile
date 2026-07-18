@@ -8,19 +8,26 @@ import React, {
 } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { AppState } from 'react-native';
-import { getMyVendor, getMyRents, getMyViolations } from '../services/vendor.service';
+import {
+  getMyVendor,
+  getMyRents,
+  getMyViolations,
+  getMyUtilityBills,
+  getMyNotifications,
+} from '../services/vendor.service';
 import {
   ensureNotificationPermissions,
   notifyNewAlerts,
   addNotificationResponseListener,
 } from '../services/notification.service';
+import { notificationToAlert } from '../utils/notificationMeta';
 import { setPendingTab } from '../navigation/pendingRoute';
 import usePolling from '../hooks/usePolling';
 
 const READ_KEYS = 'liliw_read_alert_keys';
 const AlertsContext = createContext(null);
 
-function buildAlerts({ violations, rents, products }) {
+function buildDerivedAlerts({ violations, rents, products, bills }) {
   const alerts = [];
 
   const openViolations = (violations || []).filter(
@@ -37,6 +44,7 @@ function buildAlerts({ violations, rents, products }) {
       detail: v.description || 'Please contact the market office.',
       target: 'TabViolations',
       at: v.issuedAt || v.createdAt || new Date().toISOString(),
+      source: 'derived',
     });
   });
 
@@ -50,10 +58,11 @@ function buildAlerts({ violations, rents, products }) {
       title: 'Overdue stall rent',
       message: `${r.periodLabel || 'Rent'} — ₱${Number(r.amount || 0).toLocaleString()}`,
       detail: r.dueDate
-        ? `Due date: ${new Date(r.dueDate).toLocaleDateString()}. Please settle at the market office.`
-        : 'Please settle at the market office.',
+        ? `Due date: ${new Date(r.dueDate).toLocaleDateString()}. Please settle via GCash.`
+        : 'Please settle via Market Office GCash.',
       target: 'TabRents',
       at: r.dueDate || r.updatedAt || new Date().toISOString(),
+      source: 'derived',
     });
   });
 
@@ -69,6 +78,41 @@ function buildAlerts({ violations, rents, products }) {
       detail: 'Settle your rent to stay compliant.',
       target: 'TabRents',
       at: r.dueDate || r.updatedAt || new Date().toISOString(),
+      source: 'derived',
+    });
+  });
+
+  const overdueBills = (bills || []).filter((b) => b.status === 'OVERDUE');
+  overdueBills.forEach((b) => {
+    const kind = b.type === 'WATER' ? 'Water' : 'Electricity';
+    alerts.push({
+      key: `utility-overdue:${b.id}`,
+      id: b.id,
+      type: 'UTILITY_OVERDUE',
+      severity: 'high',
+      title: `Overdue ${kind.toLowerCase()} bill`,
+      message: `${b.periodLabel || kind} — ₱${Number(b.amount || 0).toLocaleString()}`,
+      detail: 'Please settle via Market Office GCash.',
+      target: 'UtilityBills',
+      at: b.dueDate || b.updatedAt || new Date().toISOString(),
+      source: 'derived',
+    });
+  });
+
+  const unpaidBills = (bills || []).filter((b) => b.status === 'UNPAID');
+  unpaidBills.forEach((b) => {
+    const kind = b.type === 'WATER' ? 'Water' : 'Electricity';
+    alerts.push({
+      key: `utility-unpaid:${b.id}`,
+      id: b.id,
+      type: 'UTILITY_UNPAID',
+      severity: 'medium',
+      title: `Unpaid ${kind.toLowerCase()} bill`,
+      message: `${b.periodLabel || kind} — ₱${Number(b.amount || 0).toLocaleString()}`,
+      detail: 'Upload proof after paying via GCash.',
+      target: 'UtilityBills',
+      at: b.dueDate || b.updatedAt || new Date().toISOString(),
+      source: 'derived',
     });
   });
 
@@ -84,11 +128,11 @@ function buildAlerts({ violations, rents, products }) {
       detail: 'Update stock in Products so customers see accurate availability.',
       target: 'TabProducts',
       at: p.updatedAt || p.createdAt || new Date().toISOString(),
+      source: 'derived',
     });
   });
 
-  // Newest first
-  return alerts.sort((a, b) => new Date(b.at) - new Date(a.at));
+  return alerts;
 }
 
 export function AlertsProvider({ children }) {
@@ -106,33 +150,50 @@ export function AlertsProvider({ children }) {
       .catch(() => setReadKeys([]));
   }, []);
 
-  const persistReadKeys = async (keys) => {
-    const unique = [...new Set(keys)].slice(-200);
-    setReadKeys(unique);
-    await SecureStore.setItemAsync(READ_KEYS, JSON.stringify(unique));
-  };
-
   const refresh = useCallback(async () => {
     try {
-      const [vendor, rents, violations] = await Promise.all([
+      const [vendor, rents, violations, utilityBundle, notifications] = await Promise.all([
         getMyVendor().catch(() => null),
         getMyRents().catch(() => []),
         getMyViolations().catch(() => []),
+        getMyUtilityBills().catch(() => ({ bills: [] })),
+        getMyNotifications(40).catch(() => []),
       ]);
 
       const products = vendor?.products || [];
-      const nextAlerts = buildAlerts({ violations, rents, products });
+      const bills = utilityBundle?.bills || [];
+      const derived = buildDerivedAlerts({ violations, rents, products, bills });
+      const office = (notifications || []).map(notificationToAlert);
+      const nextAlerts = [...office, ...derived].sort(
+        (a, b) => new Date(b.at) - new Date(a.at)
+      );
 
-      setAlerts(nextAlerts);
+      // Skip context update when nothing changed — avoids global rerenders while typing
+      setAlerts((prev) => {
+        if (
+          prev.length === nextAlerts.length &&
+          prev.every(
+            (a, i) =>
+              a.key === nextAlerts[i].key &&
+              a.message === nextAlerts[i].message &&
+              a.at === nextAlerts[i].at
+          )
+        ) {
+          return prev;
+        }
+        return nextAlerts;
+      });
       setOpenViolations(
         violations.filter((v) => v.status === 'OPEN' || v.status === 'ACKNOWLEDGED').length
       );
       setOverdueRents(rents.filter((r) => r.status === 'OVERDUE').length);
       setLowStockCount(products.filter((p) => p.isActive && Number(p.stock) <= 5).length);
 
-      // Local push only for high-priority / actionable alerts
-      const notifiable = nextAlerts.filter((a) =>
-        ['VIOLATION', 'RENT_OVERDUE', 'LOW_STOCK'].includes(a.type)
+      // Local OS banner for high-priority / new office SMS
+      const notifiable = nextAlerts.filter(
+        (a) =>
+          a.source === 'sms' ||
+          ['VIOLATION', 'RENT_OVERDUE', 'UTILITY_OVERDUE', 'LOW_STOCK'].includes(a.type)
       );
       await notifyNewAlerts(notifiable);
       return nextAlerts;
@@ -179,15 +240,18 @@ export function AlertsProvider({ children }) {
     });
   }, []);
 
-  const markAllRead = useCallback(async (keys) => {
-    const toMark = Array.isArray(keys) ? keys : alerts.map((a) => a.key);
-    if (!toMark.length) return;
-    setReadKeys((prev) => {
-      const unique = [...new Set([...prev, ...toMark])].slice(-200);
-      SecureStore.setItemAsync(READ_KEYS, JSON.stringify(unique));
-      return unique;
-    });
-  }, [alerts]);
+  const markAllRead = useCallback(
+    async (keys) => {
+      const toMark = Array.isArray(keys) ? keys : alerts.map((a) => a.key);
+      if (!toMark.length) return;
+      setReadKeys((prev) => {
+        const unique = [...new Set([...prev, ...toMark])].slice(-200);
+        SecureStore.setItemAsync(READ_KEYS, JSON.stringify(unique));
+        return unique;
+      });
+    },
+    [alerts]
+  );
 
   /** Clear Violations tab badge — vendor already opened the list */
   const markViolationsSeen = useCallback(async () => {

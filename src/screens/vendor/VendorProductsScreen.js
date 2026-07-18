@@ -15,7 +15,6 @@ import {
   Platform,
   ActionSheetIOS,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { pickerAssetToUploadFile } from '../../utils/pickerFile';
 import {
@@ -27,14 +26,29 @@ import {
   toggleProduct,
   deleteProduct,
 } from '../../services/product.service';
+import { getPermitCompliance } from '../../services/vendor.service';
 import usePolling from '../../hooks/usePolling';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import EmptyState from '../../components/EmptyState';
 import LoadingScreen from '../../components/LoadingScreen';
+import {
+  ArchiveBoxIcon,
+  CameraIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  LockClosedIcon,
+  MagnifyingGlassIcon,
+  PencilSquareIcon,
+  PhotoIcon,
+  PlusIcon,
+  TrashIcon,
+  XCircleIcon,
+  XMarkIcon,
+} from '../../components/icons';
 import { uploadUrl } from '../../utils/media';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 
 const MAX_PRODUCT_IMAGES = 5;
 
@@ -62,8 +76,11 @@ function assetToFile(asset, index = 0) {
 }
 
 export default function VendorProductsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [products, setProducts] = useState([]);
   const [vendor, setVendor] = useState(null);
+  const [compliance, setCompliance] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -82,12 +99,19 @@ export default function VendorProductsScreen() {
   const [localImages, setLocalImages] = useState([]);
 
   const approved = vendor?.status === 'APPROVED';
+  const permitExpired = Boolean(compliance?.expired || compliance?.blocked);
+  const canAddProducts = approved && !permitExpired;
 
   const fetchAll = useCallback(async () => {
     try {
-      const [prods, v] = await Promise.all([getMyProducts(), getMyVendorStatus()]);
+      const [prods, v, c] = await Promise.all([
+        getMyProducts(),
+        getMyVendorStatus(),
+        getPermitCompliance().catch(() => null),
+      ]);
       setProducts(prods);
       setVendor(v);
+      setCompliance(c);
     } catch {
       // keep last data on poll failure
     } finally {
@@ -172,8 +196,16 @@ export default function VendorProductsScreen() {
   const openCreate = () => {
     if (!approved) {
       Alert.alert(
-        'Not approved yet',
+        'Not available yet',
         'You can manage products only after your vendor application is approved.'
+      );
+      return;
+    }
+    if (permitExpired) {
+      Alert.alert(
+        'Business Permit expired',
+        compliance?.banner?.message ||
+          'Your Business Permit has expired. Please submit your renewed permit for approval before adding products.'
       );
       return;
     }
@@ -367,7 +399,7 @@ export default function VendorProductsScreen() {
             <Image source={{ uri: thumb }} style={styles.thumb} />
           ) : (
             <View style={styles.productAvatar}>
-              <Ionicons name="image-outline" size={22} color={colors.primary} />
+              <PhotoIcon size={22} color={colors.primary} />
             </View>
           )}
 
@@ -408,21 +440,21 @@ export default function VendorProductsScreen() {
             style={styles.actionBtn}
             onPress={() => openEdit(item)}
           >
-            <Ionicons name="create-outline" size={16} color={colors.primary} />
+            <PencilSquareIcon size={16} color={colors.primary} />
             <Text style={styles.actionBtnText}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleToggle(item)}>
-            <Ionicons
-              name={item.isActive ? 'eye-off-outline' : 'eye-outline'}
-              size={16}
-              color={colors.gray700}
-            />
+            {item.isActive ? (
+              <EyeSlashIcon size={16} color={colors.gray700} />
+            ) : (
+              <EyeIcon size={16} color={colors.gray700} />
+            )}
             <Text style={[styles.actionBtnText, { color: colors.gray700 }]}>
               {item.isActive ? 'Hide' : 'Show'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item)}>
-            <Ionicons name="trash-outline" size={16} color={colors.danger} />
+            <TrashIcon size={16} color={colors.danger} />
             <Text style={[styles.actionBtnText, { color: colors.danger }]}>Remove</Text>
           </TouchableOpacity>
         </View>
@@ -436,18 +468,28 @@ export default function VendorProductsScreen() {
     <View style={styles.container}>
       {!approved ? (
         <View style={styles.lockBanner}>
-          <Ionicons name="lock-closed-outline" size={18} color={colors.warning} />
+          <LockClosedIcon size={18} color={colors.warning} />
           <Text style={styles.lockText}>
             {vendor
-              ? `Store status: ${vendor.status}. Product management unlocks after approval.`
+              ? `Store status: ${vendor.status}. Product management unlocks after admin approval.`
               : 'Submit a vendor application in Profile before adding products.'}
+          </Text>
+        </View>
+      ) : null}
+
+      {permitExpired ? (
+        <View style={[styles.lockBanner, { backgroundColor: colors.dangerLight || '#FEE2E2' }]}>
+          <LockClosedIcon size={18} color={colors.danger} />
+          <Text style={[styles.lockText, { color: colors.danger }]}>
+            {compliance?.banner?.message ||
+              'Your Business Permit has expired. Existing products remain visible — renew your permit to add new ones.'}
           </Text>
         </View>
       ) : null}
 
       <View style={styles.topBar}>
         <View style={styles.searchWrap}>
-          <Ionicons name="search" size={16} color={colors.gray400} />
+          <MagnifyingGlassIcon size={16} color={colors.gray400} />
           <TextInput
             style={styles.searchInput}
             placeholder="Search products"
@@ -457,10 +499,10 @@ export default function VendorProductsScreen() {
           />
         </View>
         <TouchableOpacity
-          style={[styles.addBtn, !approved && styles.addBtnDisabled]}
+          style={[styles.addBtn, !canAddProducts && styles.addBtnDisabled]}
           onPress={openCreate}
         >
-          <Ionicons name="add" size={20} color={colors.white} />
+          <PlusIcon size={20} color={colors.white} />
         </TouchableOpacity>
       </View>
 
@@ -514,7 +556,7 @@ export default function VendorProductsScreen() {
         }
         ListEmptyComponent={
           <EmptyState
-            icon="📦"
+            icon={ArchiveBoxIcon}
             title={search || filter !== 'ALL' ? 'No matching products' : 'No products yet'}
             subtitle={
               approved
@@ -531,7 +573,7 @@ export default function VendorProductsScreen() {
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>{editing ? 'Edit Product' : 'New Product'}</Text>
             <TouchableOpacity onPress={closeForm} hitSlop={12}>
-              <Ionicons name="close" size={24} color={colors.gray500} />
+              <XMarkIcon size={24} color={colors.gray500} />
             </TouchableOpacity>
           </View>
 
@@ -560,7 +602,7 @@ export default function VendorProductsScreen() {
                           onPress={() => removeLocalImage(index)}
                           hitSlop={8}
                         >
-                          <Ionicons name="close-circle" size={22} color={colors.danger} />
+                          <XCircleIcon size={22} color={colors.danger} />
                         </TouchableOpacity>
                       </View>
                     ))
@@ -575,7 +617,7 @@ export default function VendorProductsScreen() {
 
                 {(localImages.length === 0 || remainingSlots > 0) && (
                   <TouchableOpacity style={styles.photoAdd} onPress={openPhotoPicker}>
-                    <Ionicons name="camera-outline" size={24} color={colors.primary} />
+                    <CameraIcon size={24} color={colors.primary} />
                     <Text style={styles.photoAddText}>
                       {localImages.length || existingImages.length ? 'Add' : 'Camera'}
                     </Text>
@@ -698,227 +740,228 @@ export default function VendorProductsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.gray50 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.pageBg },
 
-  lockBanner: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'flex-start',
-    backgroundColor: colors.warningLight,
-    marginHorizontal: 16,
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 12,
-  },
-  lockText: { flex: 1, fontSize: 12, color: colors.warning, fontWeight: '600', lineHeight: 17 },
+    lockBanner: {
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'flex-start',
+      backgroundColor: colors.warningLight,
+      marginHorizontal: 16,
+      marginTop: 12,
+      padding: 12,
+      borderRadius: 12,
+    },
+    lockText: { flex: 1, fontSize: 12, color: colors.warning, fontWeight: '600', lineHeight: 17 },
 
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  searchWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: colors.gray200,
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.gray900,
-  },
-  addBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnDisabled: { opacity: 0.45 },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+    },
+    searchWrap: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      borderWidth: 1,
+      borderColor: colors.gray200,
+    },
+    searchInput: {
+      flex: 1,
+      paddingVertical: 10,
+      fontSize: 14,
+      color: colors.gray900,
+    },
+    addBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addBtnDisabled: { opacity: 0.45 },
 
-  statsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    gap: 6,
-  },
-  statText: { fontSize: 12, color: colors.gray500, fontWeight: '600' },
-  statDot: { color: colors.gray300 },
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      gap: 6,
+    },
+    statText: { fontSize: 12, color: colors.gray500, fontWeight: '600' },
+    statDot: { color: colors.gray300 },
 
-  filtersWrap: {
-    height: 52,
-    justifyContent: 'center',
-  },
-  filtersScroll: {
-    flexGrow: 0,
-  },
-  filters: {
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    flexDirection: 'row',
-  },
-  filterChip: {
-    height: 36,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.gray300,
-    marginRight: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.gray800,
-    lineHeight: 18,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-  filterTextActive: { color: colors.white },
+    filtersWrap: {
+      height: 52,
+      justifyContent: 'center',
+    },
+    filtersScroll: {
+      flexGrow: 0,
+    },
+    filters: {
+      paddingHorizontal: 16,
+      alignItems: 'center',
+      flexDirection: 'row',
+    },
+    filterChip: {
+      height: 36,
+      paddingHorizontal: 14,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.gray300,
+      marginRight: 8,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    filterChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    filterText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.gray800,
+      lineHeight: 18,
+      includeFontPadding: false,
+      textAlignVertical: 'center',
+    },
+    filterTextActive: { color: colors.white },
 
-  list: { padding: 16, gap: 10, paddingBottom: 40, flexGrow: 1 },
+    list: { padding: 16, gap: 10, paddingBottom: 40, flexGrow: 1 },
 
-  productCard: { padding: 12 },
-  productRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
-  thumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: colors.gray100 },
-  productAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 12,
-    backgroundColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  productAvatarText: { fontSize: 18, fontWeight: '700', color: colors.primary },
-  productInfo: { flex: 1 },
-  productName: { fontSize: 15, fontWeight: '700', color: colors.gray900 },
-  productCategory: { fontSize: 12, color: colors.gray400, marginTop: 1 },
-  productPrice: { fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 4 },
-  productStock: { fontSize: 12, color: colors.gray400, marginTop: 2 },
-  lowStock: { color: colors.danger, fontWeight: '700' },
-  productActions: { alignItems: 'flex-end' },
-  activeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
-  activeBadgeText: { fontSize: 11, fontWeight: '700' },
+    productCard: { padding: 12 },
+    productRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
+    thumb: { width: 52, height: 52, borderRadius: 12, backgroundColor: colors.gray100 },
+    productAvatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 12,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    productAvatarText: { fontSize: 18, fontWeight: '700', color: colors.primary },
+    productInfo: { flex: 1 },
+    productName: { fontSize: 15, fontWeight: '700', color: colors.gray900 },
+    productCategory: { fontSize: 12, color: colors.gray400, marginTop: 1 },
+    productPrice: { fontSize: 13, fontWeight: '700', color: colors.primary, marginTop: 4 },
+    productStock: { fontSize: 12, color: colors.gray400, marginTop: 2 },
+    lowStock: { color: colors.danger, fontWeight: '700' },
+    productActions: { alignItems: 'flex-end' },
+    activeBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+    activeBadgeText: { fontSize: 11, fontWeight: '700' },
 
-  photoSection: { marginBottom: 16 },
-  photoWrap: { marginRight: 10, position: 'relative' },
-  photoThumb: {
-    width: 84,
-    height: 84,
-    borderRadius: 12,
-    backgroundColor: colors.gray100,
-  },
-  photoRemove: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: colors.white,
-    borderRadius: 12,
-  },
-  photoAdd: {
-    width: 84,
-    height: 84,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primaryLight,
-    gap: 4,
-  },
-  photoAddText: { fontSize: 11, fontWeight: '700', color: colors.primary },
-  photoHint: { fontSize: 12, color: colors.gray400, marginTop: 8, lineHeight: 16 },
+    photoSection: { marginBottom: 16 },
+    photoWrap: { marginRight: 10, position: 'relative' },
+    photoThumb: {
+      width: 84,
+      height: 84,
+      borderRadius: 12,
+      backgroundColor: colors.gray100,
+    },
+    photoRemove: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+    },
+    photoAdd: {
+      width: 84,
+      height: 84,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryLight,
+      gap: 4,
+    },
+    photoAddText: { fontSize: 11, fontWeight: '700', color: colors.primary },
+    photoHint: { fontSize: 12, color: colors.gray400, marginTop: 8, lineHeight: 16 },
 
-  actionRow: {
-    flexDirection: 'row',
-    marginTop: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.gray100,
-    paddingTop: 8,
-    gap: 8,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: colors.gray50,
-  },
-  actionBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    actionRow: {
+      flexDirection: 'row',
+      marginTop: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.gray100,
+      paddingTop: 8,
+      gap: 8,
+    },
+    actionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: colors.gray50,
+    },
+    actionBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
 
-  modal: { flex: 1, backgroundColor: colors.white },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
-  },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: colors.gray900 },
-  modalBody: { padding: 20 },
+    modal: { flex: 1, backgroundColor: colors.surface },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      paddingTop: 24,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.gray100,
+    },
+    modalTitle: { fontSize: 18, fontWeight: '800', color: colors.gray900 },
+    modalBody: { padding: 20 },
 
-  fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.gray700, marginBottom: 8 },
-  loadingWrap: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
-  loadingText: { marginLeft: 8, fontSize: 13, color: colors.gray500 },
-  chipScroll: { marginBottom: 6 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: colors.gray100,
-    marginRight: 8,
-  },
-  chipActive: { backgroundColor: colors.primary },
-  chipText: { fontSize: 13, fontWeight: '600', color: colors.gray500 },
-  chipTextActive: { color: colors.white },
-  errorText: { fontSize: 12, color: colors.danger, marginBottom: 14 },
+    fieldLabel: { fontSize: 13, fontWeight: '600', color: colors.gray700, marginBottom: 8 },
+    loadingWrap: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+    loadingText: { marginLeft: 8, fontSize: 13, color: colors.gray500 },
+    chipScroll: { marginBottom: 6 },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: colors.gray100,
+      marginRight: 8,
+    },
+    chipActive: { backgroundColor: colors.primary },
+    chipText: { fontSize: 13, fontWeight: '600', color: colors.gray500 },
+    chipTextActive: { color: colors.white },
+    errorText: { fontSize: 12, color: colors.danger, marginBottom: 14 },
 
-  priceRow: { flexDirection: 'row', gap: 10 },
-  priceInput: { flex: 1 },
-  unitInput: { width: 110 },
-  unitWrap: { gap: 4 },
-  unitChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: colors.gray100,
-  },
-  unitChipActive: { backgroundColor: colors.primary },
-  unitChipText: { fontSize: 11, fontWeight: '700', color: colors.gray500, textAlign: 'center' },
-  unitChipTextActive: { color: colors.white },
+    priceRow: { flexDirection: 'row', gap: 10 },
+    priceInput: { flex: 1 },
+    unitInput: { width: 110 },
+    unitWrap: { gap: 4 },
+    unitChip: {
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      borderRadius: 8,
+      backgroundColor: colors.gray100,
+    },
+    unitChipActive: { backgroundColor: colors.primary },
+    unitChipText: { fontSize: 11, fontWeight: '700', color: colors.gray500, textAlign: 'center' },
+    unitChipTextActive: { color: colors.white },
 
-  previewBox: {
-    backgroundColor: colors.primaryLight,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 14,
-  },
-  previewText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
+    previewBox: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 8,
+      padding: 10,
+      marginBottom: 14,
+    },
+    previewText: { fontSize: 13, color: colors.primary, fontWeight: '600' },
 
-  textarea: { minHeight: 80, textAlignVertical: 'top' },
-  saveBtn: { marginTop: 12, marginBottom: 40 },
-});
+    textarea: { minHeight: 80, textAlignVertical: 'top' },
+    saveBtn: { marginTop: 12, marginBottom: 40 },
+  });

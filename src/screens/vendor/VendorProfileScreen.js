@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,13 +12,13 @@ import {
   Image,
   ActionSheetIOS,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
 import {
   getMyVendor,
   submitVendorApplication,
   updateVendorProfile,
+  getPermitCompliance,
 } from '../../services/vendor.service';
 import { updateProfile, changePassword } from '../../services/user.service';
 import Input from '../../components/Input';
@@ -26,15 +26,36 @@ import Button from '../../components/Button';
 import Badge from '../../components/Badge';
 import LoadingScreen from '../../components/LoadingScreen';
 import StoreAvatar from '../../components/StoreAvatar';
+import {
+  BuildingStorefrontIcon,
+  BanknotesIcon,
+  CameraIcon,
+  DocumentIcon,
+  ClipboardDocumentIcon,
+  CheckCircleIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  LifebuoyIcon,
+  LockClosedIcon,
+  MoonIcon,
+  NoSymbolIcon,
+  PhotoIcon,
+  PencilSquareIcon,
+  PowerIcon,
+  RocketLaunchIcon,
+  SunIcon,
+  UserIcon,
+  XCircleIcon,
+} from '../../components/icons';
 import { sanitizePhoneInput } from '../../utils/phone';
 import { uploadUrl } from '../../utils/media';
 import { pickerAssetToUploadFile } from '../../utils/pickerFile';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../context/ThemeContext';
 
 const TABS = [
-  { id: 'store', label: 'Store', icon: 'storefront-outline' },
-  { id: 'account', label: 'Account', icon: 'person-outline' },
-  { id: 'security', label: 'Security', icon: 'lock-closed-outline' },
+  { id: 'store', label: 'Store', icon: BuildingStorefrontIcon },
+  { id: 'account', label: 'Account', icon: UserIcon },
+  { id: 'security', label: 'Security', icon: LockClosedIcon },
 ];
 
 const BUSINESS_TYPES = [
@@ -46,37 +67,37 @@ const BUSINESS_TYPES = [
   'Local Products',
 ];
 
-const STATUS_META = {
+const buildStatusMeta = (colors) => ({
   PENDING: {
-    icon: 'time-outline',
+    icon: ClockIcon,
     title: 'Under review',
-    message: 'Your application is pending admin approval. You will get an SMS when reviewed.',
+    message: 'Application submitted. You can view your store details here while admin verifies documents. Editing unlocks after approval.',
     bg: colors.warningLight,
     color: colors.warning,
   },
   APPROVED: {
-    icon: 'checkmark-circle-outline',
+    icon: CheckCircleIcon,
     title: 'Approved vendor',
     message: 'Your store profile is active. You can update store details below.',
     bg: colors.successLight,
     color: colors.success,
   },
   REJECTED: {
-    icon: 'close-circle-outline',
+    icon: XCircleIcon,
     title: 'Application rejected',
     message: 'Update your details and re-submit your application.',
     bg: colors.dangerLight,
     color: colors.danger,
   },
   SUSPENDED: {
-    icon: 'ban-outline',
+    icon: NoSymbolIcon,
     title: 'Account suspended',
     message:
       'Your stall is temporarily suspended. Your store profile and products are kept. Contact the market office — once reactivated, everything comes back.',
     bg: colors.gray100,
     color: colors.gray600,
   },
-};
+});
 
 const EMPTY_STORE = {
   storeName: '',
@@ -87,13 +108,81 @@ const EMPTY_STORE = {
   businessType: '',
 };
 
+function ProfileEditToolbar({
+  isEditing,
+  saving,
+  onStartEdit,
+  onCancel,
+  onSave,
+}) {
+  const { colors } = useTheme();
+  const toolbarStyles = useMemo(() => createToolbarStyles(colors), [colors]);
+  if (isEditing) {
+    return (
+      <View style={toolbarStyles.row}>
+        <Button
+          title="Cancel"
+          variant="secondary"
+          size="sm"
+          onPress={onCancel}
+          disabled={saving}
+          style={toolbarStyles.btn}
+        />
+        <Button
+          title="Save"
+          size="sm"
+          onPress={onSave}
+          loading={saving}
+          style={toolbarStyles.btn}
+        />
+      </View>
+    );
+  }
+
+  return (
+    <TouchableOpacity
+      style={toolbarStyles.editBtn}
+      onPress={onStartEdit}
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel="Edit profile"
+    >
+      <PencilSquareIcon size={16} color={colors.primary} />
+      <Text style={toolbarStyles.editText}>Edit</Text>
+    </TouchableOpacity>
+  );
+}
+
+const createToolbarStyles = (colors) =>
+  StyleSheet.create({
+    row: { flexDirection: 'row', gap: 8 },
+    btn: { minWidth: 88 },
+    editBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+      backgroundColor: colors.surface,
+    },
+    editText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+  });
+
 export default function VendorProfileScreen({ navigation }) {
   const { user, logout, refreshUser } = useAuth();
+  const { colors, mode, setMode, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const statusMeta = useMemo(() => buildStatusMeta(colors), [colors]);
   const [tab, setTab] = useState('store');
   const [vendor, setVendor] = useState(null);
+  const [compliance, setCompliance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   const [storeForm, setStoreForm] = useState(EMPTY_STORE);
   const [logoLocal, setLogoLocal] = useState(null); // { uri, name, type }
@@ -111,10 +200,14 @@ export default function VendorProfileScreen({ navigation }) {
 
   const loadVendor = useCallback(async () => {
     try {
-      const v = await getMyVendor();
+      const [v, c] = await Promise.all([
+        getMyVendor(),
+        getPermitCompliance().catch(() => null),
+      ]);
       // Only clear profile when API confirms there is none (404 → null).
       // Never wipe local vendor data on network/auth glitches.
       setVendor(v);
+      setCompliance(c);
       setLogoLocal(null);
       setLogoRemoteFailed(false);
       if (v) {
@@ -161,11 +254,65 @@ export default function VendorProfileScreen({ navigation }) {
   const setAccount = (key, val) => setAccountForm((f) => ({ ...f, [key]: val }));
   const setPassword = (key, val) => setPasswordForm((f) => ({ ...f, [key]: val }));
 
+  const resetStoreForm = () => {
+    if (vendor) {
+      setStoreForm({
+        storeName: vendor.storeName || '',
+        description: vendor.description || '',
+        address: vendor.address || '',
+        phone: vendor.phone || '',
+        stallNumber: vendor.stallNumber || '',
+        businessType: vendor.businessType || '',
+      });
+    } else {
+      setStoreForm({
+        ...EMPTY_STORE,
+        phone: user?.phone || '',
+        address: user?.address || '',
+      });
+    }
+    setLogoLocal(null);
+    setLogoRemoteFailed(false);
+  };
+
+  const resetAccountForm = () => {
+    setAccountForm({
+      name: user?.name || '',
+      phone: user?.phone || '',
+      address: user?.address || '',
+    });
+  };
+
+  const handleStartEdit = () => {
+    if (tab === 'account') resetAccountForm();
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    if (tab === 'store') resetStoreForm();
+    else if (tab === 'account') resetAccountForm();
+    setIsEditing(false);
+  };
+
+  const handleTabChange = (nextTab) => {
+    if (isEditing) {
+      if (tab === 'store') resetStoreForm();
+      else if (tab === 'account') resetAccountForm();
+      setIsEditing(false);
+    }
+    setTab(nextTab);
+  };
+
   const canEditStore =
     !vendor || vendor.status === 'APPROVED' || vendor.status === 'REJECTED';
   const canEditLogo = canEditStore;
   const isNewApplication = !vendor;
   const isReapply = vendor?.status === 'REJECTED';
+  const storeAlwaysEditing = isNewApplication || isReapply;
+  const storeFieldsEditable = canEditStore && (storeAlwaysEditing || isEditing);
+  const accountFieldsEditable = isEditing;
+  const showStoreEditToolbar = canEditStore && !storeAlwaysEditing;
+  const showAccountEditToolbar = true;
 
   const logoPreviewUri =
     logoLocal?.uri ||
@@ -205,8 +352,8 @@ export default function VendorProfileScreen({ navigation }) {
   };
 
   const openLogoPicker = () => {
-    if (!canEditLogo) {
-      Alert.alert('Locked', 'Store logo can be changed after your application is approved (or when re-applying).');
+    if (!canEditLogo || !storeFieldsEditable) {
+      Alert.alert('View only', 'Tap Edit to change your store logo.');
       return;
     }
     if (Platform.OS === 'ios') {
@@ -259,6 +406,15 @@ export default function VendorProfileScreen({ navigation }) {
     }
     if (!validateStore()) return;
 
+    if ((isNewApplication || isReapply) && (compliance?.expired || compliance?.blocked)) {
+      Alert.alert(
+        'Business Permit expired',
+        compliance?.banner?.message ||
+          'Your Business Permit has expired. Submit a renewed permit before creating or re-applying for a store.'
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       if (isNewApplication || isReapply) {
@@ -283,6 +439,7 @@ export default function VendorProfileScreen({ navigation }) {
       }
       setLogoLocal(null);
       setLogoRemoteFailed(false);
+      setIsEditing(false);
       await loadVendor();
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to save store profile');
@@ -309,6 +466,7 @@ export default function VendorProfileScreen({ navigation }) {
         address: accountForm.address || '',
       });
       await refreshUser();
+      setIsEditing(false);
       Alert.alert('Saved', 'Account details updated.');
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to update account');
@@ -355,7 +513,8 @@ export default function VendorProfileScreen({ navigation }) {
 
   if (loading) return <LoadingScreen message="Loading profile..." />;
 
-  const status = vendor ? STATUS_META[vendor.status] : null;
+  const status = vendor ? statusMeta[vendor.status] : null;
+  const StatusIcon = status?.icon;
 
   return (
     <KeyboardAvoidingView
@@ -383,9 +542,9 @@ export default function VendorProfileScreen({ navigation }) {
         <View style={styles.hero}>
           <TouchableOpacity
             style={styles.avatarTouch}
-            onPress={tab === 'store' ? openLogoPicker : undefined}
-            activeOpacity={tab === 'store' && canEditLogo ? 0.8 : 1}
-            disabled={tab !== 'store'}
+            onPress={tab === 'store' && storeFieldsEditable ? openLogoPicker : undefined}
+            activeOpacity={tab === 'store' && storeFieldsEditable ? 0.8 : 1}
+            disabled={tab !== 'store' || !storeFieldsEditable}
           >
             {logoLocal?.uri ? (
               <Image source={{ uri: logoLocal.uri }} style={styles.avatarImage} />
@@ -398,9 +557,9 @@ export default function VendorProfileScreen({ navigation }) {
                 radius={24}
               />
             )}
-            {tab === 'store' && canEditLogo ? (
+            {tab === 'store' && storeFieldsEditable ? (
               <View style={styles.cameraBadge}>
-                <Ionicons name="camera" size={12} color={colors.white} />
+                <CameraIcon size={12} color={colors.white} />
               </View>
             ) : null}
           </TouchableOpacity>
@@ -422,15 +581,15 @@ export default function VendorProfileScreen({ navigation }) {
         <View style={styles.tabs}>
           {TABS.map((t) => {
             const active = tab === t.id;
+            const TabIcon = t.icon;
             return (
               <TouchableOpacity
                 key={t.id}
                 style={[styles.tab, active && styles.tabActive]}
-                onPress={() => setTab(t.id)}
+                onPress={() => handleTabChange(t.id)}
                 activeOpacity={0.8}
               >
-                <Ionicons
-                  name={t.icon}
+                <TabIcon
                   size={16}
                   color={active ? colors.primary : colors.gray400}
                 />
@@ -445,7 +604,7 @@ export default function VendorProfileScreen({ navigation }) {
           <View style={styles.panel}>
             {status ? (
               <View style={[styles.statusCard, { backgroundColor: status.bg }]}>
-                <Ionicons name={status.icon} size={22} color={status.color} />
+                {StatusIcon ? <StatusIcon size={22} color={status.color} /> : null}
                 <View style={styles.statusCopy}>
                   <Text style={[styles.statusTitle, { color: status.color }]}>{status.title}</Text>
                   <Text style={[styles.statusMsg, { color: status.color }]}>{status.message}</Text>
@@ -458,7 +617,7 @@ export default function VendorProfileScreen({ navigation }) {
               </View>
             ) : (
               <View style={[styles.statusCard, { backgroundColor: colors.primaryLight }]}>
-                <Ionicons name="rocket-outline" size={22} color={colors.primary} />
+                <RocketLaunchIcon size={22} color={colors.primary} />
                 <View style={styles.statusCopy}>
                   <Text style={[styles.statusTitle, { color: colors.primary }]}>
                     Create your store
@@ -470,12 +629,12 @@ export default function VendorProfileScreen({ navigation }) {
               </View>
             )}
 
-            <Text style={styles.sectionTitle}>Store logo</Text>
+            <Text style={styles.subsectionLabel}>Store logo</Text>
             <View style={styles.logoRow}>
               <TouchableOpacity
                 style={styles.logoPreview}
                 onPress={openLogoPicker}
-                disabled={!canEditLogo}
+                disabled={!storeFieldsEditable}
                 activeOpacity={0.85}
               >
                 {logoPreviewUri ? (
@@ -488,7 +647,7 @@ export default function VendorProfileScreen({ navigation }) {
                   />
                 ) : (
                   <View style={styles.logoPlaceholder}>
-                    <Ionicons name="image-outline" size={28} color={colors.gray400} />
+                    <PhotoIcon size={28} color={colors.gray400} />
                     <Text style={styles.logoPlaceholderText}>No logo</Text>
                   </View>
                 )}
@@ -497,7 +656,7 @@ export default function VendorProfileScreen({ navigation }) {
                 <Text style={styles.logoHint}>
                   Square image works best (JPEG/PNG, max 5MB).
                 </Text>
-                {canEditLogo ? (
+                {storeFieldsEditable ? (
                   <Button
                     title={logoPreviewUri ? 'Change Logo' : 'Upload Logo'}
                     variant="outline"
@@ -505,6 +664,8 @@ export default function VendorProfileScreen({ navigation }) {
                     onPress={openLogoPicker}
                     style={{ marginTop: 8, alignSelf: 'flex-start' }}
                   />
+                ) : showStoreEditToolbar ? (
+                  <Text style={styles.lockedHint}>Tap Edit to change your store logo.</Text>
                 ) : (
                   <Text style={styles.lockedHint}>
                     Logo editing unlocks when approved or when re-applying.
@@ -516,21 +677,34 @@ export default function VendorProfileScreen({ navigation }) {
               </View>
             </View>
 
-            <Text style={styles.sectionTitle}>Store information</Text>
+            <View style={styles.panelHeader}>
+              <Text style={styles.sectionTitleInline}>Store information</Text>
+              {showStoreEditToolbar ? (
+                <ProfileEditToolbar
+                  isEditing={isEditing}
+                  saving={saving}
+                  onStartEdit={handleStartEdit}
+                  onCancel={handleCancelEdit}
+                  onSave={handleSaveStore}
+                />
+              ) : null}
+            </View>
 
             <Input
               label="Store Name *"
               placeholder="e.g. Juan's Fresh Goods"
               value={storeForm.storeName}
               onChangeText={(v) => setStore('storeName', v)}
-              editable={canEditStore}
+              editable={storeFieldsEditable}
+              containerStyle={!storeFieldsEditable ? styles.readOnlyField : undefined}
             />
             <Input
               label="Store Address *"
               placeholder="Liliw Public Market, Laguna"
               value={storeForm.address}
               onChangeText={(v) => setStore('address', v)}
-              editable={canEditStore}
+              editable={storeFieldsEditable}
+              containerStyle={!storeFieldsEditable ? styles.readOnlyField : undefined}
             />
             <Input
               label="Contact Number *"
@@ -538,14 +712,16 @@ export default function VendorProfileScreen({ navigation }) {
               keyboardType="phone-pad"
               value={storeForm.phone}
               onChangeText={(v) => setStore('phone', sanitizePhoneInput(v))}
-              editable={canEditStore}
+              editable={storeFieldsEditable}
+              containerStyle={!storeFieldsEditable ? styles.readOnlyField : undefined}
             />
             <Input
               label="Preferred Stall No."
               placeholder="e.g. A-12"
               value={storeForm.stallNumber}
               onChangeText={(v) => setStore('stallNumber', v)}
-              editable={canEditStore}
+              editable={storeFieldsEditable}
+              containerStyle={!storeFieldsEditable ? styles.readOnlyField : undefined}
             />
             <Input
               label="Store Description"
@@ -555,7 +731,8 @@ export default function VendorProfileScreen({ navigation }) {
               multiline
               numberOfLines={3}
               style={styles.textarea}
-              editable={canEditStore}
+              editable={storeFieldsEditable}
+              containerStyle={!storeFieldsEditable ? styles.readOnlyField : undefined}
             />
 
             <Text style={styles.fieldLabel}>Business Type *</Text>
@@ -565,12 +742,12 @@ export default function VendorProfileScreen({ navigation }) {
                 return (
                   <TouchableOpacity
                     key={type}
-                    disabled={!canEditStore}
+                    disabled={!storeFieldsEditable}
                     onPress={() => setStore('businessType', type)}
                     style={[
                       styles.typeChip,
                       active && styles.typeChipActive,
-                      !canEditStore && styles.typeChipDisabled,
+                      !storeFieldsEditable && styles.typeChipDisabled,
                     ]}
                   >
                     <Text
@@ -586,7 +763,7 @@ export default function VendorProfileScreen({ navigation }) {
               })}
             </View>
 
-            {canEditStore ? (
+            {storeAlwaysEditing && canEditStore ? (
               <Button
                 title={
                   isNewApplication
@@ -598,26 +775,39 @@ export default function VendorProfileScreen({ navigation }) {
                 onPress={handleSaveStore}
                 loading={saving}
               />
-            ) : (
+            ) : !canEditStore ? (
               <Text style={styles.lockedHint}>
                 Editing is locked while your application is {vendor?.status?.toLowerCase()}.
               </Text>
-            )}
+            ) : null}
           </View>
         ) : null}
 
         {/* ACCOUNT TAB */}
         {tab === 'account' ? (
           <View style={styles.panel}>
-            <Text style={styles.sectionTitle}>Account details</Text>
-            <Text style={styles.helper}>
-              These are your personal login details (separate from store info).
-            </Text>
+            <View style={styles.panelHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sectionTitleInline}>Account details</Text>
+                <Text style={styles.helper}>Personal login details (separate from store info).</Text>
+              </View>
+              {showAccountEditToolbar ? (
+                <ProfileEditToolbar
+                  isEditing={isEditing}
+                  saving={saving}
+                  onStartEdit={handleStartEdit}
+                  onCancel={handleCancelEdit}
+                  onSave={handleSaveAccount}
+                />
+              ) : null}
+            </View>
             <Input
               label="Full Name *"
               value={accountForm.name}
               onChangeText={(v) => setAccount('name', v)}
               autoCapitalize="words"
+              editable={accountFieldsEditable}
+              containerStyle={!accountFieldsEditable ? styles.readOnlyField : undefined}
             />
             <Input
               label="Email"
@@ -631,14 +821,17 @@ export default function VendorProfileScreen({ navigation }) {
               keyboardType="phone-pad"
               value={accountForm.phone}
               onChangeText={(v) => setAccount('phone', sanitizePhoneInput(v))}
+              editable={accountFieldsEditable}
+              containerStyle={!accountFieldsEditable ? styles.readOnlyField : undefined}
             />
             <Input
               label="Address"
               placeholder="Your home / delivery address"
               value={accountForm.address}
               onChangeText={(v) => setAccount('address', v)}
+              editable={accountFieldsEditable}
+              containerStyle={!accountFieldsEditable ? styles.readOnlyField : undefined}
             />
-            <Button title="Save Account" onPress={handleSaveAccount} loading={saving} />
           </View>
         ) : null}
 
@@ -669,18 +862,113 @@ export default function VendorProfileScreen({ navigation }) {
           </View>
         ) : null}
 
+        {/* Appearance */}
+        <View style={styles.appearanceCard}>
+          <View style={styles.appearanceHeader}>
+            {isDark ? (
+              <MoonIcon size={18} color={colors.primary} />
+            ) : (
+              <SunIcon size={18} color={colors.primary} />
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={styles.appearanceTitle}>Appearance</Text>
+              <Text style={styles.appearanceSub}>
+                {isDark ? 'Dark mode is on' : 'Light mode is on'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.modeSwitch}>
+            <TouchableOpacity
+              style={[styles.modeOption, mode === 'light' && styles.modeOptionActive]}
+              onPress={() => setMode('light')}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ selected: mode === 'light' }}
+              accessibilityLabel="Use light mode"
+            >
+              <SunIcon
+                size={16}
+                color={mode === 'light' ? colors.primary : colors.gray400}
+              />
+              <Text
+                style={[styles.modeOptionText, mode === 'light' && styles.modeOptionTextActive]}
+              >
+                Light
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeOption, mode === 'dark' && styles.modeOptionActive]}
+              onPress={() => setMode('dark')}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityState={{ selected: mode === 'dark' }}
+              accessibilityLabel="Use dark mode"
+            >
+              <MoonIcon
+                size={16}
+                color={mode === 'dark' ? colors.primary : colors.gray400}
+              />
+              <Text
+                style={[styles.modeOptionText, mode === 'dark' && styles.modeOptionTextActive]}
+              >
+                Dark
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.helpBtn}
+          onPress={() => navigation.navigate('AvailableStalls')}
+          activeOpacity={0.85}
+        >
+          <BuildingStorefrontIcon size={18} color={colors.primary} />
+          <Text style={styles.helpBtnText}>Available Stalls</Text>
+          <ChevronRightIcon size={16} color={colors.gray300} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.helpBtn}
+          onPress={() => navigation.navigate('Payments')}
+          activeOpacity={0.85}
+        >
+          <BanknotesIcon size={18} color={colors.primary} />
+          <Text style={styles.helpBtnText}>Payments</Text>
+          <ChevronRightIcon size={16} color={colors.gray300} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.helpBtn}
+          onPress={() => navigation.navigate('BusinessPermit')}
+          activeOpacity={0.85}
+        >
+          <DocumentIcon size={18} color={colors.primary} />
+          <Text style={styles.helpBtnText}>Business Permit</Text>
+          <ChevronRightIcon size={16} color={colors.gray300} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.helpBtn}
+          onPress={() => navigation.navigate('BusinessPermitApplication')}
+          activeOpacity={0.85}
+        >
+          <ClipboardDocumentIcon size={18} color={colors.primary} />
+          <Text style={styles.helpBtnText}>Business Permit Application</Text>
+          <ChevronRightIcon size={16} color={colors.gray300} />
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.helpBtn}
           onPress={() => navigation.navigate('HelpCenter')}
           activeOpacity={0.85}
         >
-          <Ionicons name="help-buoy-outline" size={18} color={colors.primary} />
+          <LifebuoyIcon size={18} color={colors.primary} />
           <Text style={styles.helpBtnText}>Help Center / FAQs</Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.gray300} />
+          <ChevronRightIcon size={16} color={colors.gray300} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={confirmLogout} activeOpacity={0.85}>
-          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+          <PowerIcon size={18} color={colors.danger} />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -688,12 +976,13 @@ export default function VendorProfileScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.gray50 },
+const createStyles = (colors, isDark) =>
+  StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.pageBg },
   content: { paddingBottom: 40 },
 
   hero: {
-    backgroundColor: colors.primary,
+    backgroundColor: isDark ? colors.primaryDark : colors.primary,
     paddingTop: 12,
     paddingBottom: 28,
     paddingHorizontal: 20,
@@ -746,9 +1035,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginHorizontal: 16,
     marginTop: -16,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 4,
+    borderWidth: 1,
+    borderColor: colors.borderBrand,
     shadowColor: colors.black,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -771,9 +1062,11 @@ const styles = StyleSheet.create({
   panel: {
     marginHorizontal: 16,
     marginTop: 16,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 16,
+    borderWidth: 1,
+    borderColor: colors.borderBrand,
   },
 
   statusCard: {
@@ -794,7 +1087,25 @@ const styles = StyleSheet.create({
     color: colors.gray900,
     marginBottom: 12,
   },
-  helper: { fontSize: 12, color: colors.gray400, marginBottom: 12, lineHeight: 17 },
+  sectionTitleInline: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: colors.gray900,
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  subsectionLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.gray700,
+    marginBottom: 10,
+  },
+  helper: { fontSize: 12, color: colors.gray400, marginTop: 2, lineHeight: 17 },
 
   fieldLabel: {
     fontSize: 13,
@@ -826,6 +1137,7 @@ const styles = StyleSheet.create({
 
   textarea: { minHeight: 80, textAlignVertical: 'top' },
   disabledField: { opacity: 0.7 },
+  readOnlyField: { opacity: 0.92 },
   lockedHint: {
     fontSize: 12,
     color: colors.gray400,
@@ -833,16 +1145,59 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
+  appearanceCard: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.borderBrand,
+  },
+  appearanceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 12,
+  },
+  appearanceTitle: { fontSize: 15, fontWeight: '700', color: colors.ink },
+  appearanceSub: { fontSize: 12, color: colors.inkMuted, marginTop: 1 },
+  modeSwitch: {
+    flexDirection: 'row',
+    backgroundColor: colors.gray100,
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  modeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    borderRadius: 9,
+  },
+  modeOptionActive: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderBrandStrong,
+  },
+  modeOptionText: { fontSize: 13, fontWeight: '600', color: colors.gray500 },
+  modeOptionTextActive: { color: colors.primary, fontWeight: '700' },
+
   helpBtn: {
     marginHorizontal: 16,
     marginTop: 16,
-    backgroundColor: colors.white,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
+    borderWidth: 1,
+    borderColor: colors.borderBrand,
   },
   helpBtnText: { flex: 1, fontSize: 15, fontWeight: '700', color: colors.primary },
 
@@ -858,4 +1213,4 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   logoutText: { fontSize: 15, fontWeight: '700', color: colors.danger },
-});
+  });

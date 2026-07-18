@@ -56,10 +56,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const register = useCallback(async (payload) => {
-    const data = await authService.register(payload);
-    assertVendor(data.user);
-    setUser(data.user);
-    return data.user;
+    // OTP signup is handled on RegisterScreen; keep for compatibility.
+    return authService.registerSendOtp(payload);
   }, []);
 
   const logout = useCallback(async () => {
