@@ -1,16 +1,19 @@
 import { API_BASE_URL } from '../config/env';
 import { getStoredToken } from './api';
 import api from './api';
+import { fetchWithOfflineCache } from '../utils/storageCache';
 
 /** GET /vendors/me — returns null when profile not created yet (404). */
 export async function getMyVendor() {
-  try {
-    const res = await api.get('/vendors/me');
-    return res.data;
-  } catch (err) {
-    if (err.response?.status === 404) return null;
-    throw err;
-  }
+  return fetchWithOfflineCache('vendor_me', async () => {
+    try {
+      const res = await api.get('/vendors/me');
+      return res.data;
+    } catch (err) {
+      if (err.response?.status === 404) return null;
+      throw err;
+    }
+  });
 }
 
 /** GET /vendor-portal/status */
@@ -101,26 +104,32 @@ export async function updateVendorProfile(form, files = {}) {
 }
 
 export async function getMyViolations() {
-  const res = await api.get('/violations/my');
-  return Array.isArray(res.data) ? res.data : res.data?.violations || [];
+  return fetchWithOfflineCache('vendor_violations', async () => {
+    const res = await api.get('/violations/my');
+    return Array.isArray(res.data) ? res.data : res.data?.violations || [];
+  });
 }
 
 /** GET /stall-rents/my — rents list only (dashboard-friendly). */
 export async function getMyRents() {
-  const res = await api.get('/stall-rents/my');
-  return Array.isArray(res.data) ? res.data : res.data?.rents || [];
+  return fetchWithOfflineCache('vendor_rents', async () => {
+    const res = await api.get('/stall-rents/my');
+    return Array.isArray(res.data) ? res.data : res.data?.rents || [];
+  });
 }
 
 /** Full stall-rent payload including Market Office GCash. */
 export async function getMyRentsBundle() {
-  const res = await api.get('/stall-rents/my');
-  if (Array.isArray(res.data)) {
-    return { rents: res.data, officeGcash: { number: null, accountName: null } };
-  }
-  return {
-    rents: res.data?.rents || [],
-    officeGcash: res.data?.officeGcash || { number: null, accountName: null },
-  };
+  return fetchWithOfflineCache('vendor_rents_bundle', async () => {
+    const res = await api.get('/stall-rents/my');
+    if (Array.isArray(res.data)) {
+      return { rents: res.data, officeGcash: { number: null, accountName: null } };
+    }
+    return {
+      rents: res.data?.rents || [],
+      officeGcash: res.data?.officeGcash || { number: null, accountName: null },
+    };
+  });
 }
 
 /** POST /stall-rents/:id/proof (multipart) */
@@ -132,13 +141,15 @@ export async function uploadRentProof(rentId, file) {
 
 /** GET /utility-bills/my */
 export async function getMyUtilityBills(type) {
-  const res = await api.get('/utility-bills/my', {
-    params: type ? { type } : undefined,
+  return fetchWithOfflineCache(`vendor_utility_bills_${type || 'all'}`, async () => {
+    const res = await api.get('/utility-bills/my', {
+      params: type ? { type } : undefined,
+    });
+    return {
+      bills: res.data?.bills || [],
+      officeGcash: res.data?.officeGcash || { number: null, accountName: null },
+    };
   });
-  return {
-    bills: res.data?.bills || [],
-    officeGcash: res.data?.officeGcash || { number: null, accountName: null },
-  };
 }
 
 /** POST /utility-bills/:id/proof (multipart) */
@@ -150,8 +161,10 @@ export async function uploadUtilityProof(billId, file) {
 
 /** GET /payments/my */
 export async function getMyPayments() {
-  const res = await api.get('/payments/my');
-  return res.data;
+  return fetchWithOfflineCache('vendor_payments', async () => {
+    const res = await api.get('/payments/my');
+    return res.data;
+  });
 }
 
 /** POST /payments/my (multipart) */
@@ -166,19 +179,23 @@ export async function submitPayment(fields, proofFile) {
 
 /** GET /business-permits/my */
 export async function getMyBusinessPermits() {
-  const res = await api.get('/business-permits/my');
-  return {
-    permits: res.data?.permits || [],
-    categories: res.data?.categories || [],
-    vendor: res.data?.vendor || null,
-    compliance: res.data?.compliance || null,
-  };
+  return fetchWithOfflineCache('vendor_permits', async () => {
+    const res = await api.get('/business-permits/my');
+    return {
+      permits: res.data?.permits || [],
+      categories: res.data?.categories || [],
+      vendor: res.data?.vendor || null,
+      compliance: res.data?.compliance || null,
+    };
+  });
 }
 
 /** GET /business-permits/my/compliance */
 export async function getPermitCompliance() {
-  const res = await api.get('/business-permits/my/compliance');
-  return res.data;
+  return fetchWithOfflineCache('vendor_compliance', async () => {
+    const res = await api.get('/business-permits/my/compliance');
+    return res.data;
+  });
 }
 
 /** POST /business-permits/my (multipart) */

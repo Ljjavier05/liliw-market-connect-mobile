@@ -28,6 +28,7 @@ export { default as ExclamationTriangleIcon } from 'react-native-heroicons/outli
 export { default as EyeIcon } from 'react-native-heroicons/outline/EyeIcon';
 export { default as EyeSlashIcon } from 'react-native-heroicons/outline/EyeSlashIcon';
 export { default as FlagIcon } from 'react-native-heroicons/outline/FlagIcon';
+export { default as FingerPrintIcon } from 'react-native-heroicons/outline/FingerPrintIcon';
 export { default as InboxIcon } from 'react-native-heroicons/outline/InboxIcon';
 export { default as LifebuoyIcon } from 'react-native-heroicons/outline/LifebuoyIcon';
 export { default as LockClosedIcon } from 'react-native-heroicons/outline/LockClosedIcon';
@@ -49,6 +50,12 @@ export { default as TrashIcon } from 'react-native-heroicons/outline/TrashIcon';
 export { default as UserIcon } from 'react-native-heroicons/outline/UserIcon';
 export { default as XCircleIcon } from 'react-native-heroicons/outline/XCircleIcon';
 export { default as XMarkIcon } from 'react-native-heroicons/outline/XMarkIcon';
+export { default as MegaphoneIcon } from 'react-native-heroicons/outline/MegaphoneIcon';
+export { default as SparklesIcon } from 'react-native-heroicons/outline/SparklesIcon';
+export { default as LinkIcon } from 'react-native-heroicons/outline/LinkIcon';
+export { default as ArrowTopRightOnSquareIcon } from 'react-native-heroicons/outline/ArrowTopRightOnSquareIcon';
+export { default as ShareIcon } from 'react-native-heroicons/outline/ShareIcon';
+export { default as ArrowDownTrayIcon } from 'react-native-heroicons/outline/ArrowDownTrayIcon';
 
 export { default as BellSolidIcon } from 'react-native-heroicons/solid/BellIcon';
 export { default as CheckCircleSolidIcon } from 'react-native-heroicons/solid/CheckCircleIcon';

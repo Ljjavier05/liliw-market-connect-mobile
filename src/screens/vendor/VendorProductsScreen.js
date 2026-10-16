@@ -33,6 +33,7 @@ import Button from '../../components/Button';
 import Input from '../../components/Input';
 import EmptyState from '../../components/EmptyState';
 import LoadingScreen from '../../components/LoadingScreen';
+import { successHaptic, mediumHaptic, warningHaptic } from '../../utils/haptics';
 import {
   ArchiveBoxIcon,
   CameraIcon,
@@ -89,6 +90,7 @@ export default function VendorProductsScreen() {
 
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [viewingProduct, setViewingProduct] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
@@ -352,6 +354,7 @@ export default function VendorProductsScreen() {
       }
       closeForm();
       fetchAll();
+      successHaptic();
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || err.message || 'Failed to save product');
     } finally {
@@ -362,6 +365,7 @@ export default function VendorProductsScreen() {
   const handleToggle = async (product) => {
     try {
       await toggleProduct(product.id, product.isActive);
+      mediumHaptic();
       fetchAll();
     } catch (err) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to update product');
@@ -369,6 +373,7 @@ export default function VendorProductsScreen() {
   };
 
   const handleDelete = (product) => {
+    warningHaptic();
     Alert.alert('Hide product', `Remove "${product.name}" from your active listings?`, [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -377,6 +382,7 @@ export default function VendorProductsScreen() {
         onPress: async () => {
           try {
             await deleteProduct(product.id);
+            successHaptic();
             fetchAll();
           } catch (err) {
             Alert.alert('Error', err.response?.data?.message || 'Failed to delete');
@@ -388,18 +394,21 @@ export default function VendorProductsScreen() {
 
   const renderItem = ({ item }) => {
     const thumb = uploadUrl(item.images?.[0], item.updatedAt);
+    const isLow = item.stock <= 5;
+    const isOut = item.stock === 0;
+
     return (
       <Card style={styles.productCard}>
         <TouchableOpacity
           style={styles.productRow}
           activeOpacity={0.85}
-          onPress={() => openEdit(item)}
+          onPress={() => setViewingProduct(item)}
         >
           {thumb ? (
             <Image source={{ uri: thumb }} style={styles.thumb} />
           ) : (
             <View style={styles.productAvatar}>
-              <PhotoIcon size={22} color={colors.primary} />
+              <PhotoIcon size={24} color={colors.primary} />
             </View>
           )}
 
@@ -411,9 +420,23 @@ export default function VendorProductsScreen() {
             <Text style={styles.productPrice}>
               ₱{Number(item.price).toFixed(2)} / {(item.priceUnit || 'PIECE').toLowerCase()}
             </Text>
-            <Text style={[styles.productStock, item.stock <= 5 && styles.lowStock]}>
-              {item.stock <= 5 ? `${item.stock} left` : `${item.stock} in stock`}
-            </Text>
+            <View style={styles.stockStatusRow}>
+              <View
+                style={[
+                  styles.stockDot,
+                  { backgroundColor: isOut ? colors.danger : isLow ? colors.warning : colors.success },
+                ]}
+              />
+              <Text
+                style={[
+                  styles.productStock,
+                  isOut && { color: colors.danger, fontWeight: '700' },
+                  isLow && !isOut && styles.lowStock,
+                ]}
+              >
+                {isOut ? 'Out of stock' : isLow ? `${item.stock} left (Low)` : `${item.stock} available`}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.productActions}>
@@ -438,9 +461,16 @@ export default function VendorProductsScreen() {
         <View style={styles.actionRow}>
           <TouchableOpacity
             style={styles.actionBtn}
+            onPress={() => setViewingProduct(item)}
+          >
+            <EyeIcon size={16} color={colors.primary} />
+            <Text style={[styles.actionBtnText, { color: colors.primary }]}>Details</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionBtn}
             onPress={() => openEdit(item)}
           >
-            <PencilSquareIcon size={16} color={colors.primary} />
+            <PencilSquareIcon size={16} color={colors.gray700} />
             <Text style={styles.actionBtnText}>Edit</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionBtn} onPress={() => handleToggle(item)}>
@@ -736,6 +766,137 @@ export default function VendorProductsScreen() {
           </ScrollView>
         </View>
       </Modal>
+
+      {/* Product Details Modal (View Only, Management Catalog, No Cart) */}
+      <Modal visible={Boolean(viewingProduct)} animationType="slide" presentationStyle="pageSheet">
+        <View style={styles.modal}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Product Details</Text>
+            <TouchableOpacity onPress={() => setViewingProduct(null)} hitSlop={12}>
+              <XMarkIcon size={24} color={colors.gray500} />
+            </TouchableOpacity>
+          </View>
+
+          {viewingProduct && (
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* Product Hero Image */}
+              <View style={styles.detailImageWrap}>
+                {viewingProduct.images?.[0] ? (
+                  <Image
+                    source={{ uri: uploadUrl(viewingProduct.images[0], viewingProduct.updatedAt) }}
+                    style={styles.detailImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={styles.detailPlaceholder}>
+                    <PhotoIcon size={48} color={colors.primary} />
+                    <Text style={styles.detailPlaceholderText}>No image uploaded</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Status and Category Badges */}
+              <View style={styles.detailBadgesRow}>
+                <View style={styles.detailCategoryBadge}>
+                  <Text style={styles.detailCategoryText}>
+                    {viewingProduct.category?.name || 'General Product'}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.activeBadge,
+                    { backgroundColor: viewingProduct.isActive ? colors.successLight : colors.gray100 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.activeBadgeText,
+                      { color: viewingProduct.isActive ? colors.success : colors.gray500 },
+                    ]}
+                  >
+                    {viewingProduct.isActive ? 'Active Listing' : 'Hidden from Market'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Title & Price */}
+              <Text style={styles.detailTitle}>{viewingProduct.name}</Text>
+              <Text style={styles.detailPrice}>
+                ₱{Number(viewingProduct.price).toFixed(2)}
+                <Text style={styles.detailPriceUnit}>
+                  {' '}
+                  / {(viewingProduct.priceUnit || 'PIECE').toLowerCase()}
+                </Text>
+              </Text>
+
+              {/* Stock Inventory Card */}
+              <View style={styles.detailStockCard}>
+                <Text style={styles.detailStockLabel}>Available Inventory:</Text>
+                <View style={styles.detailStockValRow}>
+                  <View
+                    style={[
+                      styles.stockDot,
+                      {
+                        backgroundColor:
+                          viewingProduct.stock === 0
+                            ? colors.danger
+                            : viewingProduct.stock <= 5
+                            ? colors.warning
+                            : colors.success,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.detailStockValue,
+                      viewingProduct.stock === 0 && { color: colors.danger },
+                      viewingProduct.stock <= 5 && viewingProduct.stock > 0 && { color: colors.warningDeep },
+                    ]}
+                  >
+                    {viewingProduct.stock === 0
+                      ? 'Out of stock (0 available)'
+                      : `${viewingProduct.stock} ${(viewingProduct.priceUnit || 'units').toLowerCase()} available in stall`}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Description Section */}
+              <View style={styles.detailSection}>
+                <Text style={styles.detailSectionTitle}>Product Description</Text>
+                <Text style={styles.detailDescription}>
+                  {viewingProduct.description?.trim() || 'No description provided by vendor.'}
+                </Text>
+              </View>
+
+              {/* Public Market Catalog Notice */}
+              <View style={styles.managementNotice}>
+                <Text style={styles.managementNoticeText}>
+                  ℹ️ Liliw Market Connect Management System. Product catalog is strictly for price monitoring, stock auditing, and local market regulation.
+                </Text>
+              </View>
+
+              {/* Modal Actions */}
+              <View style={styles.detailActionRow}>
+                <Button
+                  title="Edit Product Details"
+                  onPress={() => {
+                    const p = viewingProduct;
+                    setViewingProduct(null);
+                    openEdit(p);
+                  }}
+                  style={styles.detailEditBtn}
+                />
+                <TouchableOpacity
+                  style={styles.detailCloseBtn}
+                  onPress={() => setViewingProduct(null)}
+                >
+                  <Text style={styles.detailCloseText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -964,4 +1125,146 @@ const createStyles = (colors) =>
 
     textarea: { minHeight: 80, textAlignVertical: 'top' },
     saveBtn: { marginTop: 12, marginBottom: 40 },
+
+    stockStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 4,
+    },
+    stockDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+
+    detailImageWrap: {
+      width: '100%',
+      height: 220,
+      borderRadius: 16,
+      overflow: 'hidden',
+      backgroundColor: colors.gray100,
+      marginBottom: 16,
+    },
+    detailImage: {
+      width: '100%',
+      height: '100%',
+    },
+    detailPlaceholder: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryLight,
+      gap: 8,
+    },
+    detailPlaceholderText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.primary,
+    },
+    detailBadgesRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    detailCategoryBadge: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 8,
+      backgroundColor: `${colors.primary}15`,
+    },
+    detailCategoryText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+    detailTitle: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: colors.ink,
+      marginBottom: 4,
+    },
+    detailPrice: {
+      fontSize: 22,
+      fontWeight: '900',
+      color: colors.primary,
+      marginBottom: 14,
+    },
+    detailPriceUnit: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.inkMuted,
+    },
+    detailStockCard: {
+      backgroundColor: colors.gray50 || colors.surface,
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+      marginBottom: 16,
+    },
+    detailStockLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      color: colors.inkMuted,
+      marginBottom: 4,
+    },
+    detailStockValRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    detailStockValue: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: colors.success,
+    },
+    detailSection: {
+      marginBottom: 16,
+    },
+    detailSectionTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.ink,
+      marginBottom: 6,
+    },
+    detailDescription: {
+      fontSize: 13,
+      color: colors.inkMuted,
+      lineHeight: 20,
+    },
+    managementNotice: {
+      backgroundColor: colors.primaryLight,
+      borderRadius: 10,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: `${colors.primary}25`,
+      marginBottom: 20,
+    },
+    managementNoticeText: {
+      fontSize: 11,
+      color: colors.primaryDark || colors.primary,
+      lineHeight: 16,
+    },
+    detailActionRow: {
+      gap: 10,
+      marginBottom: 36,
+    },
+    detailEditBtn: {
+      width: '100%',
+    },
+    detailCloseBtn: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderRadius: 12,
+      backgroundColor: colors.gray100,
+    },
+    detailCloseText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: colors.ink,
+    },
   });

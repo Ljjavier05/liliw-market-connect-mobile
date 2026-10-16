@@ -62,61 +62,61 @@ export const lightColors = {
 };
 
 export const darkColors = {
-  // Brand (website html.dark tokens)
-  primary: '#4B8FEB',
-  primaryLight: '#0A1E42',
-  primaryDark: '#0050d8',
-  primaryMid: '#6BA3F2',
-  primarySoft: '#0D2A5C',
-  primaryGlow: '#6BA3F2',
-  accent: '#fbbf24',
+  // Brand (vibrant electric accent that pops against dark charcoal)
+  primary: '#3B82F6',
+  primaryLight: 'rgba(59, 130, 246, 0.12)',
+  primaryDark: '#2563EB',
+  primaryMid: '#60A5FA',
+  primarySoft: 'rgba(59, 130, 246, 0.18)',
+  primaryGlow: '#93C5FD',
+  accent: '#F59E0B',
 
-  // Semantic status (lightened inks, translucent fills)
-  success: '#4ade80',
-  successLight: 'rgba(34, 197, 94, 0.16)',
-  warning: '#fbbf24',
-  warningLight: 'rgba(217, 119, 6, 0.18)',
-  warningSoft: 'rgba(194, 65, 12, 0.22)',
-  warningDeep: '#fdba74',
-  warningBorder: 'rgba(251, 146, 60, 0.45)',
-  danger: '#f87171',
-  dangerLight: 'rgba(220, 38, 38, 0.2)',
-  dangerSoft: 'rgba(153, 27, 27, 0.24)',
-  dangerDeep: '#fca5a5',
-  dangerBorder: 'rgba(252, 165, 165, 0.4)',
-  criticalBg: '#7f1d1d',
-  criticalText: '#fecaca',
+  // Semantic status (subtle translucent pills, high readability)
+  success: '#34D399',
+  successLight: 'rgba(16, 185, 129, 0.14)',
+  warning: '#FBBF24',
+  warningLight: 'rgba(245, 158, 11, 0.14)',
+  warningSoft: 'rgba(245, 158, 11, 0.18)',
+  warningDeep: '#FDBA74',
+  warningBorder: 'rgba(251, 146, 60, 0.35)',
+  danger: '#F87171',
+  dangerLight: 'rgba(239, 68, 68, 0.14)',
+  dangerSoft: 'rgba(239, 68, 68, 0.2)',
+  dangerDeep: '#FCA5A5',
+  dangerBorder: 'rgba(248, 113, 113, 0.35)',
+  criticalBg: '#450A0A',
+  criticalText: '#FECACA',
   orangeSoft: 'rgba(249, 115, 22, 0.14)',
-  orangeBorder: 'rgba(253, 186, 116, 0.4)',
-  orangeInk: '#fdba74',
-  amberBorder: 'rgba(253, 230, 138, 0.4)',
-  amberInk: '#fde68a',
-  redWash: 'rgba(239, 68, 68, 0.12)',
+  orangeBorder: 'rgba(253, 186, 116, 0.3)',
+  orangeInk: '#FDBA74',
+  amberBorder: 'rgba(253, 230, 138, 0.3)',
+  amberInk: '#FDE68A',
+  redWash: 'rgba(239, 68, 68, 0.1)',
 
-  // Ink / neutrals flipped for navy surfaces
-  ink: '#f1f5f9',
-  inkMuted: '#94a3b8',
-  gray50: '#0F2347',
-  gray100: '#132A52',
-  gray200: '#1E3A66',
-  gray300: '#2C4A7A',
-  gray400: '#8FA3C4',
-  gray500: '#94a3b8',
-  gray600: '#B0BFD6',
-  gray700: '#CBD5E1',
-  gray800: '#E2E8F0',
-  gray900: '#F1F5F9',
+  // Neutral inks & dark scales (modern obsidian & charcoal, no saturated navy)
+  ink: '#F8FAFC',
+  inkMuted: '#94A3B8',
+  gray50: '#111318',       // Slightly elevated dark background / input fills
+  gray100: '#181B22',      // Nested card background, chip background
+  gray200: '#232733',      // Subtle borders & card outlines
+  gray300: '#323746',      // Form borders & dividers
+  gray400: '#64748B',      // Placeholder text & inactive icons
+  gray500: '#94A3B8',      // Secondary text
+  gray600: '#CBD5E1',      // Semi-bold labels
+  gray700: '#E2E8F0',      // High-emphasis text
+  gray800: '#F1F5F9',      // Near-white text
+  gray900: '#FFFFFF',      // Pure white text
 
-  white: '#ffffff',
+  white: '#FFFFFF',
   black: '#000000',
 
-  // Surfaces & chrome (navy body like website dark)
-  surface: '#0A1E42',
-  pageBg: '#010B1F',
-  borderBrand: 'rgba(75, 143, 235, 0.15)',
-  borderBrandStrong: 'rgba(75, 143, 235, 0.28)',
-  focusRing: 'rgba(75, 143, 235, 0.35)',
-  shadowBrand: '#000000',
+  // Surfaces & chrome (Modern deep charcoal & graphite — clean, sleek, eye-friendly)
+  surface: '#14171F',      // Cards, tab bar, header bar, modal surfaces
+  pageBg: '#0B0D13',       // Main screen canvas (smooth deep obsidian)
+  borderBrand: 'rgba(255, 255, 255, 0.08)',
+  borderBrandStrong: 'rgba(255, 255, 255, 0.15)',
+  focusRing: 'rgba(59, 130, 246, 0.45)',
+  shadowBrand: 'rgba(0, 0, 0, 0.65)',
 };
 
 // Backward-compatible static export (light). Themed code should use

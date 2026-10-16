@@ -14,9 +14,11 @@ import usePolling from '../../hooks/usePolling';
 import LoadingScreen from '../../components/LoadingScreen';
 import EmptyState from '../../components/EmptyState';
 import Badge from '../../components/Badge';
-import { BanknotesIcon, DocumentIcon } from '../../components/icons';
+import { BanknotesIcon, DocumentIcon, EyeIcon, ShareIcon } from '../../components/icons';
 import { useTheme } from '../../context/ThemeContext';
 import { uploadUrl } from '../../utils/media';
+import { shareOrSaveFile } from '../../utils/fileShare';
+import { lightHaptic } from '../../utils/haptics';
 
 function money(n) {
   return `₱${Number(n || 0).toFixed(2)}`;
@@ -89,7 +91,14 @@ export default function VendorPaymentsScreen({ navigation }) {
             <TouchableOpacity
               key={r.id}
               style={styles.billRow}
-              onPress={() => navigation.navigate('VendorRentsList')}
+              onPress={() => {
+                const parent = navigation.getParent();
+                if (parent) {
+                  parent.navigate('TabRents', { screen: 'VendorRentsList' });
+                } else {
+                  navigation.navigate('TabRents');
+                }
+              }}
               activeOpacity={0.85}
             >
               <View style={{ flex: 1 }}>
@@ -153,18 +162,65 @@ export default function VendorPaymentsScreen({ navigation }) {
               <Text style={styles.reject}>{p.remarks}</Text>
             ) : null}
             {p.receipts?.[0]?.pdfPath ? (
-              <TouchableOpacity
-                onPress={() => {
-                  const url = uploadUrl(p.receipts[0].pdfPath);
-                  Linking.openURL(url).catch(() =>
-                    Alert.alert('Unable to open', 'Could not open the receipt.')
-                  );
-                }}
-                style={styles.receiptBtn}
-              >
-                <DocumentIcon size={16} color={colors.primary} />
-                <Text style={styles.receiptBtnText}>View official receipt</Text>
-              </TouchableOpacity>
+              <View style={styles.receiptActionsRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    lightHaptic();
+                    const url = uploadUrl(p.receipts[0].pdfPath);
+                    Linking.openURL(url).catch(() =>
+                      Alert.alert('Unable to open', 'Could not open the receipt.')
+                    );
+                  }}
+                  style={styles.receiptBtn}
+                  activeOpacity={0.8}
+                >
+                  <EyeIcon size={15} color={colors.primary} />
+                  <Text style={styles.receiptBtnText}>View Receipt</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    lightHaptic();
+                    const url = uploadUrl(p.receipts[0].pdfPath);
+                    shareOrSaveFile(url, `Official_Receipt_${p.receiptNumber || p.billingNumber}.pdf`);
+                  }}
+                  style={styles.receiptShareBtn}
+                  activeOpacity={0.8}
+                >
+                  <ShareIcon size={14} color={colors.ink} />
+                  <Text style={styles.receiptShareBtnText}>Save / Share</Text>
+                </TouchableOpacity>
+              </View>
+            ) : p.proofUrl ? (
+              <View style={styles.receiptActionsRow}>
+                <TouchableOpacity
+                  onPress={() => {
+                    lightHaptic();
+                    const url = uploadUrl(p.proofUrl);
+                    Linking.openURL(url).catch(() =>
+                      Alert.alert('Unable to open', 'Could not open payment proof.')
+                    );
+                  }}
+                  style={styles.receiptBtn}
+                  activeOpacity={0.8}
+                >
+                  <EyeIcon size={15} color={colors.primary} />
+                  <Text style={styles.receiptBtnText}>View Proof</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    lightHaptic();
+                    const url = uploadUrl(p.proofUrl);
+                    shareOrSaveFile(url, `Payment_Proof_${p.billingNumber}.jpg`);
+                  }}
+                  style={styles.receiptShareBtn}
+                  activeOpacity={0.8}
+                >
+                  <ShareIcon size={14} color={colors.ink} />
+                  <Text style={styles.receiptShareBtnText}>Save / Share</Text>
+                </TouchableOpacity>
+              </View>
             ) : null}
             <Text style={styles.breakdown}>
               Rental {money(p.rentalFee)} · Cleaning {money(p.cleaningFee)} · Assoc{' '}
@@ -222,8 +278,35 @@ const createStyles = (colors) =>
     payMeta: { fontSize: 12, color: colors.inkMuted, marginTop: 6 },
     receipt: { fontSize: 12, fontWeight: '600', color: colors.primary, marginTop: 4 },
     reject: { fontSize: 12, color: colors.danger, marginTop: 6 },
-    receiptBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10 },
-    receiptBtnText: { fontSize: 13, fontWeight: '700', color: colors.primary },
+    receiptActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 10,
+      flexWrap: 'wrap',
+    },
+    receiptBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      backgroundColor: `${colors.primary}12`,
+    },
+    receiptBtnText: { fontSize: 12, fontWeight: '700', color: colors.primary },
+    receiptShareBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      backgroundColor: colors.gray100,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+    },
+    receiptShareBtnText: { fontSize: 12, fontWeight: '700', color: colors.ink },
     breakdown: { fontSize: 11, color: colors.inkMuted, marginTop: 8 },
     remaining: { fontSize: 12, fontWeight: '700', color: colors.warning || colors.amber, marginTop: 4 },
   });

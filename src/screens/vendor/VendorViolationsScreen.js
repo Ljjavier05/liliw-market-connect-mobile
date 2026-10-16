@@ -13,7 +13,7 @@ const buildSeverityStyles = (colors) => ({
   WARNING: { border: colors.amberBorder, bg: colors.warningLight, text: colors.amberInk, label: 'Warning' },
   MINOR: { border: colors.orangeBorder, bg: colors.orangeSoft, text: colors.orangeInk, label: 'Minor' },
   MAJOR: { border: colors.dangerBorder, bg: colors.dangerSoft, text: colors.dangerDeep, label: 'Major' },
-  CRITICAL: { border: colors.danger, bg: colors.dangerLight, text: colors.criticalBg, label: 'Critical' },
+  CRITICAL: { border: colors.danger, bg: colors.dangerLight, text: colors.dangerDeep || colors.danger, label: 'Critical' },
 });
 
 const buildStatusStyles = (colors) => ({

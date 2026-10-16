@@ -11,6 +11,7 @@ import {
   RefreshControl,
   Image,
   ActionSheetIOS,
+  Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../context/AuthContext';
@@ -43,14 +44,25 @@ import {
   PencilSquareIcon,
   PowerIcon,
   RocketLaunchIcon,
+  MegaphoneIcon,
   SunIcon,
   UserIcon,
   XCircleIcon,
+  FingerPrintIcon,
 } from '../../components/icons';
 import { sanitizePhoneInput } from '../../utils/phone';
 import { uploadUrl } from '../../utils/media';
 import { pickerAssetToUploadFile } from '../../utils/pickerFile';
 import { useTheme } from '../../context/ThemeContext';
+import { lightHaptic, successHaptic } from '../../utils/haptics';
+import { getStoredToken } from '../../services/api';
+import {
+  getBiometricCapabilities,
+  isBiometricLoginEnabled,
+  enableBiometricLogin,
+  disableBiometricLogin,
+  promptBiometricAuth,
+} from '../../utils/biometrics';
 
 const TABS = [
   { id: 'store', label: 'Store', icon: BuildingStorefrontIcon },
@@ -197,6 +209,20 @@ export default function VendorProfileScreen({ navigation }) {
     newPassword: '',
     confirmPassword: '',
   });
+
+  const [biometricSupported, setBiometricSupported] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState('Fingerprint');
+
+  useEffect(() => {
+    (async () => {
+      const caps = await getBiometricCapabilities();
+      setBiometricSupported(caps.supported && caps.enrolled);
+      setBiometricLabel(caps.label);
+      const enabled = await isBiometricLoginEnabled();
+      setBiometricEnabled(enabled);
+    })();
+  }, []);
 
   const loadVendor = useCallback(async () => {
     try {
@@ -501,6 +527,30 @@ export default function VendorProfileScreen({ navigation }) {
       Alert.alert('Error', err.response?.data?.message || 'Failed to change password');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleBiometrics = async (nextVal) => {
+    lightHaptic();
+    if (nextVal) {
+      const authenticated = await promptBiometricAuth(`Verify your ${biometricLabel.toLowerCase()} to activate`);
+      if (!authenticated) return;
+      const currentToken = await getStoredToken();
+      if (!currentToken) {
+        Alert.alert('Session missing', 'Please sign in with password to enable biometrics.');
+        return;
+      }
+      await enableBiometricLogin(currentToken, user?.email || user?.phone);
+      setBiometricEnabled(true);
+      successHaptic();
+      Alert.alert(
+        'Biometric Sign-In Enabled',
+        `You can now quickly sign in using ${biometricLabel.toLowerCase()} without entering your password.`
+      );
+    } else {
+      await disableBiometricLogin();
+      setBiometricEnabled(false);
+      lightHaptic();
     }
   };
 
@@ -838,7 +888,34 @@ export default function VendorProfileScreen({ navigation }) {
         {/* SECURITY TAB */}
         {tab === 'security' ? (
           <View style={styles.panel}>
-            <Text style={styles.sectionTitle}>Change password</Text>
+            {/* Biometric Quick Login Switch Card */}
+            <View style={styles.biometricCard}>
+              <View style={styles.biometricCardLeft}>
+                <View style={styles.biometricIconCircle}>
+                  <FingerPrintIcon size={22} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.biometricCardTitle}>{biometricLabel} Quick Login</Text>
+                  <Text style={styles.biometricCardSub}>
+                    {biometricSupported
+                      ? biometricEnabled
+                        ? `Active — you can unlock your account using ${biometricLabel.toLowerCase()}`
+                        : `Inactive — turn on to sign in faster with ${biometricLabel.toLowerCase()}`
+                      : 'Not supported or not registered in your device settings.'}
+                  </Text>
+                </View>
+              </View>
+              {biometricSupported ? (
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={handleToggleBiometrics}
+                  trackColor={{ false: colors.gray200, true: colors.primary }}
+                  thumbColor={colors.white}
+                />
+              ) : null}
+            </View>
+
+            <Text style={[styles.sectionTitle, { marginTop: 18 }]}>Change password</Text>
             <Input
               label="Current Password"
               secureTextEntry
@@ -880,7 +957,10 @@ export default function VendorProfileScreen({ navigation }) {
           <View style={styles.modeSwitch}>
             <TouchableOpacity
               style={[styles.modeOption, mode === 'light' && styles.modeOptionActive]}
-              onPress={() => setMode('light')}
+              onPress={() => {
+                lightHaptic();
+                setMode('light');
+              }}
               activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityState={{ selected: mode === 'light' }}
@@ -898,7 +978,10 @@ export default function VendorProfileScreen({ navigation }) {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.modeOption, mode === 'dark' && styles.modeOptionActive]}
-              onPress={() => setMode('dark')}
+              onPress={() => {
+                lightHaptic();
+                setMode('dark');
+              }}
               activeOpacity={0.85}
               accessibilityRole="button"
               accessibilityState={{ selected: mode === 'dark' }}
@@ -954,6 +1037,16 @@ export default function VendorProfileScreen({ navigation }) {
         >
           <ClipboardDocumentIcon size={18} color={colors.primary} />
           <Text style={styles.helpBtnText}>Business Permit Application</Text>
+          <ChevronRightIcon size={16} color={colors.gray300} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.helpBtn}
+          onPress={() => navigation.navigate('Announcements')}
+          activeOpacity={0.85}
+        >
+          <MegaphoneIcon size={18} color={colors.primary} />
+          <Text style={styles.helpBtnText}>Municipal Announcements</Text>
           <ChevronRightIcon size={16} color={colors.gray300} />
         </TouchableOpacity>
 
@@ -1213,4 +1306,42 @@ const createStyles = (colors, isDark) =>
     gap: 8,
   },
   logoutText: { fontSize: 15, fontWeight: '700', color: colors.danger },
+
+  biometricCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: colors.gray50 || colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderBrand,
+    marginBottom: 6,
+  },
+  biometricCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  biometricIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: `${colors.primary}18`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  biometricCardTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.ink,
+  },
+  biometricCardSub: {
+    fontSize: 12,
+    color: colors.inkMuted,
+    marginTop: 2,
+    lineHeight: 16,
+  },
   });

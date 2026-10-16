@@ -1,6 +1,12 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import * as authService from '../services/auth.service';
-import { clearStoredToken, getStoredToken } from '../services/api';
+import { clearStoredToken, getStoredToken, setStoredToken } from '../services/api';
+import {
+  promptBiometricAuth,
+  isBiometricLoginEnabled,
+  getBiometricStoredToken,
+  updateBiometricTokenIfActive,
+} from '../utils/biometrics';
 
 const AuthContext = createContext(null);
 
@@ -49,10 +55,56 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(async (email, password) => {
+    const start = Date.now();
     const data = await authService.login(email, password);
     assertVendor(data.user);
+    if (data.token) {
+      await updateBiometricTokenIfActive(data.token);
+    }
+    const elapsed = Date.now() - start;
+    if (elapsed < 2000) {
+      await new Promise((resolve) => setTimeout(resolve, 2000 - elapsed));
+    }
     setUser(data.user);
-    return data.user;
+    return data;
+  }, []);
+
+  const loginWithBiometrics = useCallback(async () => {
+    const hasBiometrics = await isBiometricLoginEnabled();
+    if (!hasBiometrics) {
+      throw new Error('Biometric login is not enabled on this device.');
+    }
+
+    const authenticated = await promptBiometricAuth('Scan your fingerprint to sign in');
+    if (!authenticated) {
+      const err = new Error('Biometric verification was cancelled.');
+      err.code = 'BIOMETRIC_CANCELLED';
+      throw err;
+    }
+
+    const token = await getBiometricStoredToken();
+    if (!token) {
+      throw new Error('No saved biometric session found. Please sign in with password.');
+    }
+
+    const start = Date.now();
+    await setStoredToken(token);
+    try {
+      const me = await authService.getMe();
+      assertVendor(me);
+      const elapsed = Date.now() - start;
+      if (elapsed < 2000) {
+        await new Promise((resolve) => setTimeout(resolve, 2000 - elapsed));
+      }
+      setUser(me);
+      return me;
+    } catch (err) {
+      await clearStoredToken();
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        throw new Error('Session expired. Please sign in with password to re-enable biometric sign-in.');
+      }
+      throw err;
+    }
   }, []);
 
   const register = useCallback(async (payload) => {
@@ -78,11 +130,12 @@ export function AuthProvider({ children }) {
       loading,
       isAuthenticated: !!user,
       login,
+      loginWithBiometrics,
       register,
       logout,
       refreshUser,
     }),
-    [user, loading, login, register, logout, refreshUser]
+    [user, loading, login, loginWithBiometrics, register, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

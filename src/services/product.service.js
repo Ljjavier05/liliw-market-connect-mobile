@@ -1,31 +1,38 @@
 import { API_BASE_URL } from '../config/env';
 import { getStoredToken } from './api';
 import api from './api';
+import { fetchWithOfflineCache } from '../utils/storageCache';
 
 export async function getCategories() {
-  const res = await api.get('/categories');
-  return Array.isArray(res.data) ? res.data : res.data?.categories || [];
+  return fetchWithOfflineCache('market_categories', async () => {
+    const res = await api.get('/categories');
+    return Array.isArray(res.data) ? res.data : res.data?.categories || [];
+  });
 }
 
 /** Products come nested under GET /vendors/me */
 export async function getMyProducts() {
-  try {
-    const res = await api.get('/vendors/me');
-    return res.data?.products || [];
-  } catch (err) {
-    if (err.response?.status === 404) return [];
-    throw err;
-  }
+  return fetchWithOfflineCache('vendor_products', async () => {
+    try {
+      const res = await api.get('/vendors/me');
+      return res.data?.products || [];
+    } catch (err) {
+      if (err.response?.status === 404) return [];
+      throw err;
+    }
+  });
 }
 
 export async function getMyVendorStatus() {
-  try {
-    const res = await api.get('/vendors/me');
-    return res.data;
-  } catch (err) {
-    if (err.response?.status === 404) return null;
-    throw err;
-  }
+  return fetchWithOfflineCache('vendor_status', async () => {
+    try {
+      const res = await api.get('/vendors/me');
+      return res.data;
+    } catch (err) {
+      if (err.response?.status === 404) return null;
+      throw err;
+    }
+  });
 }
 
 function appendFields(fd, fields) {

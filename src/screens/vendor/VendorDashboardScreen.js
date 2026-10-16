@@ -17,6 +17,7 @@ import {
   getPricingInsights,
   getPermitCompliance,
 } from '../../services/vendor.service';
+import { getAnnouncements } from '../../services/announcement.service';
 import Badge from '../../components/Badge';
 import StatCard from '../../components/StatCard';
 import LoadingScreen from '../../components/LoadingScreen';
@@ -33,6 +34,7 @@ import {
   DocumentIcon,
   ClipboardDocumentIcon,
   ExclamationTriangleIcon,
+  MegaphoneIcon,
 } from '../../components/icons';
 
 function insightStatus(row, colors) {
@@ -60,24 +62,27 @@ export default function VendorDashboardScreen({ navigation }) {
   const [violations, setViolations] = useState([]);
   const [insights, setInsights] = useState([]);
   const [compliance, setCompliance] = useState(null);
+  const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loginWarnShown, setLoginWarnShown] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
-      const [v, r, vi, pi, c] = await Promise.all([
+      const [v, r, vi, pi, c, ann] = await Promise.all([
         getMyVendor(),
         getMyRents().catch(() => []),
         getMyViolations().catch(() => []),
         getPricingInsights().catch(() => []),
         getPermitCompliance().catch(() => null),
+        getAnnouncements().catch(() => []),
       ]);
       setVendor(v);
       setRents(r);
       setViolations(vi);
       setInsights(Array.isArray(pi) ? pi : []);
       setCompliance(c);
+      setAnnouncements(Array.isArray(ann) ? ann : []);
     } catch (err) {
       if (err?.response?.data?.code === 'ACCOUNT_DEACTIVATED') {
         await logout();
@@ -146,9 +151,22 @@ export default function VendorDashboardScreen({ navigation }) {
       }
       showsVerticalScrollIndicator={false}
     >
+      <View style={styles.brandRow}>
+        <View style={styles.brandBadge}>
+          <Text style={styles.brandBadgeText}>OFFICIAL VENDOR PORTAL</Text>
+        </View>
+      </View>
       <View style={styles.header}>
-        <Text style={styles.greeting}>{greetingForHour(new Date().getHours())}</Text>
-        <Text style={styles.name}>{user?.name}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.greeting}>{greetingForHour(new Date().getHours())},</Text>
+          <Text style={styles.name}>{user?.name}</Text>
+        </View>
+        {vendor?.stallNumber ? (
+          <View style={styles.stallBadge}>
+            <BuildingStorefrontIcon size={14} color={colors.primary} />
+            <Text style={styles.stallBadgeText}>Stall {vendor.stallNumber}</Text>
+          </View>
+        ) : null}
       </View>
 
       {alertsCtx && alertsCtx.unreadCount > 0 ? (
@@ -310,6 +328,55 @@ export default function VendorDashboardScreen({ navigation }) {
             </View>
           )}
 
+          {/* Municipal Announcements Widget */}
+          {announcements.length > 0 && (
+            <View style={styles.announcementCard}>
+              <View style={styles.announcementCardHeader}>
+                <View style={styles.announcementTitleRow}>
+                  <View style={styles.announcementIconCircle}>
+                    <MegaphoneIcon size={16} color={colors.primary} />
+                  </View>
+                  <Text style={styles.announcementHeaderTitle}>Municipal Announcements</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Announcements')}
+                  hitSlop={8}
+                >
+                  <Text style={styles.seeAll}>View all ({announcements.length}) →</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.announcementItem}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate('Announcements')}
+              >
+                <View style={{ flex: 1 }}>
+                  <View style={styles.announcementMetaRow}>
+                    {announcements[0].isPinned ? (
+                      <View style={styles.announcementPinnedPill}>
+                        <Text style={styles.announcementPinnedText}>PINNED</Text>
+                      </View>
+                    ) : null}
+                    <Text style={styles.announcementDate}>
+                      {new Date(announcements[0].createdAt).toLocaleDateString('en-PH', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })}
+                    </Text>
+                  </View>
+                  <Text style={styles.announcementTitle} numberOfLines={1}>
+                    {announcements[0].title}
+                  </Text>
+                  <Text style={styles.announcementSnippet} numberOfLines={2}>
+                    {announcements[0].body}
+                  </Text>
+                </View>
+                <ChevronRightIcon size={18} color={colors.gray400} />
+              </TouchableOpacity>
+            </View>
+          )}
+
           {vendor.status === 'APPROVED' ? (
             <>
               <Text style={styles.sectionTitle}>Store overview</Text>
@@ -408,6 +475,15 @@ export default function VendorDashboardScreen({ navigation }) {
                 <Text style={[styles.panelTitle, { marginBottom: 4 }]}>Market desk</Text>
                 <TouchableOpacity
                   style={[styles.quickLink, { borderTopWidth: 0 }]}
+                  onPress={() => navigation.navigate('Announcements')}
+                  activeOpacity={0.85}
+                >
+                  <MegaphoneIcon size={18} color={colors.primary} />
+                  <Text style={styles.quickLinkText}>Municipal Announcements</Text>
+                  <ChevronRightIcon size={16} color={colors.gray300} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickLink}
                   onPress={() => navigation.navigate('AvailableStalls')}
                   activeOpacity={0.85}
                 >
@@ -502,7 +578,7 @@ export default function VendorDashboardScreen({ navigation }) {
             </>
           ) : null}
         </>
-      )}
+      ) : null}
     </ScrollView>
   );
 }
@@ -512,9 +588,128 @@ const createStyles = (colors) =>
     container: { flex: 1, backgroundColor: colors.pageBg },
     content: { padding: 20, paddingBottom: 40 },
 
-    header: { marginBottom: 16, paddingTop: 4 },
+    brandRow: { marginBottom: 6 },
+    brandBadge: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: `${colors.primary}15`,
+      borderWidth: 1,
+      borderColor: `${colors.primary}30`,
+    },
+    brandBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: colors.primary,
+      letterSpacing: 0.6,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+      paddingTop: 4,
+    },
     greeting: { fontSize: 13, color: colors.gray400 },
     name: { fontSize: 22, fontWeight: '800', color: colors.gray900 },
+    stallBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 10,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+    },
+    stallBadgeText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.primary,
+    },
+
+    announcementCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+      shadowColor: colors.shadowBrand,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    announcementCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    announcementTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    announcementIconCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: `${colors.primary}18`,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    announcementHeaderTitle: {
+      fontSize: 13,
+      fontWeight: '800',
+      color: colors.ink,
+    },
+    announcementItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: colors.gray50 || colors.surface,
+      borderRadius: 12,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: colors.borderBrand,
+    },
+    announcementMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 3,
+    },
+    announcementPinnedPill: {
+      backgroundColor: `${colors.accent || '#f59e0b'}25`,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+    },
+    announcementPinnedText: {
+      fontSize: 9,
+      fontWeight: '900',
+      color: colors.accent || '#f59e0b',
+    },
+    announcementDate: {
+      fontSize: 10,
+      color: colors.inkMuted,
+      fontWeight: '600',
+    },
+    announcementTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.ink,
+      marginBottom: 2,
+    },
+    announcementSnippet: {
+      fontSize: 12,
+      color: colors.inkMuted,
+      lineHeight: 16,
+    },
 
     alertsBanner: {
       flexDirection: 'row',

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, TouchableOpacity, View, Text } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, Text, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -17,9 +17,13 @@ import VendorProfileScreen from '../screens/vendor/VendorProfileScreen';
 import PricingInsightsScreen from '../screens/vendor/PricingInsightsScreen';
 import AlertsScreen from '../screens/vendor/AlertsScreen';
 import VendorHelpCenterScreen from '../screens/vendor/VendorHelpCenterScreen';
+import VendorAnnouncementsScreen from '../screens/vendor/VendorAnnouncementsScreen';
 import { AlertsProvider, useAlerts } from '../context/AlertsContext';
 import { consumePendingTab } from './pendingRoute';
 import { useTheme } from '../context/ThemeContext';
+import { lightHaptic } from '../utils/haptics';
+
+const brandLogo = require('../../assets/liliw-seal.png');
 import {
   ArchiveBoxIcon,
   ArchiveBoxSolidIcon,
@@ -72,6 +76,19 @@ function AlertsBell({ navigation }) {
   );
 }
 
+function DashboardHeaderTitle() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
+  return (
+    <View style={styles.headerTitleWrap}>
+      <Image source={brandLogo} style={styles.headerTitleLogo} resizeMode="contain" />
+      <Text style={[styles.headerTitleText, { color: colors.ink }]} numberOfLines={1}>
+        Liliw Market Connect
+      </Text>
+    </View>
+  );
+}
+
 function DashboardStack() {
   const stackOpts = useStackOpts();
   return (
@@ -80,7 +97,8 @@ function DashboardStack() {
         name="VendorHome"
         component={VendorDashboardScreen}
         options={({ navigation }) => ({
-          title: 'Dashboard',
+          headerTitle: () => <DashboardHeaderTitle />,
+          headerTitleAlign: 'left',
           headerRight: () => <AlertsBell navigation={navigation} />,
         })}
       />
@@ -88,6 +106,11 @@ function DashboardStack() {
         name="PricingInsights"
         component={PricingInsightsScreen}
         options={{ title: 'Price Watch' }}
+      />
+      <Stack.Screen
+        name="Announcements"
+        component={VendorAnnouncementsScreen}
+        options={{ title: 'Announcements' }}
       />
       <Stack.Screen name="Alerts" component={AlertsScreen} options={{ title: 'Alerts' }} />
       <Stack.Screen
@@ -183,6 +206,11 @@ function ProfileStack() {
         options={{ title: 'Help Center' }}
       />
       <Stack.Screen
+        name="Announcements"
+        component={VendorAnnouncementsScreen}
+        options={{ title: 'Announcements' }}
+      />
+      <Stack.Screen
         name="AvailableStalls"
         component={VendorAvailableStallsScreen}
         options={{ title: 'Available Stalls' }}
@@ -251,6 +279,11 @@ function VendorTabs() {
 
   return (
     <Tab.Navigator
+      screenListeners={{
+        tabPress: () => {
+          lightHaptic();
+        },
+      }}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
@@ -358,5 +391,20 @@ const createStyles = (colors) =>
       color: colors.white,
       fontSize: 9,
       fontWeight: '800',
+    },
+    headerTitleWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    headerTitleLogo: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    headerTitleText: {
+      fontSize: 18,
+      fontWeight: '800',
+      letterSpacing: -0.3,
     },
   });
