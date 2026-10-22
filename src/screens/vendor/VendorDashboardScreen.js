@@ -429,7 +429,7 @@ export default function VendorDashboardScreen({ navigation }) {
               {unpaidRents.length > 0 ? (
                 <View style={styles.panel}>
                   <View style={styles.panelHeader}>
-                    <Text style={styles.panelTitle}>Unpaid rent</Text>
+                    <Text style={styles.panelTitle}>Unpaid rent & dues</Text>
                     <TouchableOpacity onPress={() => navigation.navigate('TabRents')}>
                       <Text style={styles.seeAll}>View all</Text>
                     </TouchableOpacity>

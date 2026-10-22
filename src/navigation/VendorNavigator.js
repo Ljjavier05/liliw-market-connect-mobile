@@ -125,8 +125,9 @@ function DashboardStack() {
       />
       <Stack.Screen
         name="UtilityBills"
-        component={VendorUtilityBillsScreen}
-        options={{ title: 'Water & Electricity' }}
+        component={VendorRentsScreen}
+        options={{ title: 'Water & Electricity Dues' }}
+        initialParams={{ initialCategory: 'WATER' }}
       />
       <Stack.Screen
         name="BusinessPermit"
@@ -175,17 +176,18 @@ function RentsStack() {
       <Stack.Screen
         name="VendorRentsList"
         component={VendorRentsScreen}
-        options={{ title: 'Stall Rent' }}
+        options={{ title: 'Stall Rent & Dues' }}
       />
       <Stack.Screen
         name="UtilityBills"
-        component={VendorUtilityBillsScreen}
-        options={{ title: 'Water & Electricity' }}
+        component={VendorRentsScreen}
+        options={{ title: 'Water & Electricity Dues' }}
+        initialParams={{ initialCategory: 'WATER' }}
       />
       <Stack.Screen
         name="Payments"
         component={VendorPaymentsScreen}
-        options={{ title: 'Payments' }}
+        options={{ title: 'Payment History' }}
       />
     </Stack.Navigator>
   );
@@ -217,13 +219,14 @@ function ProfileStack() {
       />
       <Stack.Screen
         name="UtilityBills"
-        component={VendorUtilityBillsScreen}
-        options={{ title: 'Water & Electricity' }}
+        component={VendorRentsScreen}
+        options={{ title: 'Water & Electricity Dues' }}
+        initialParams={{ initialCategory: 'WATER' }}
       />
       <Stack.Screen
         name="Payments"
         component={VendorPaymentsScreen}
-        options={{ title: 'Payments' }}
+        options={{ title: 'Payment History' }}
       />
       <Stack.Screen
         name="BusinessPermit"
@@ -329,7 +332,7 @@ function VendorTabs() {
         name="TabRents"
         component={RentsStack}
         options={{
-          title: 'Rent',
+          title: 'Rent & Dues',
           tabBarBadge: overdueRents > 0 ? (overdueRents > 9 ? '9+' : overdueRents) : undefined,
           tabBarBadgeStyle: styles.badge,
         }}

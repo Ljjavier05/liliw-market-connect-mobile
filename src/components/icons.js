@@ -4,6 +4,7 @@
 export { default as ArchiveBoxIcon } from 'react-native-heroicons/outline/ArchiveBoxIcon';
 export { default as ArrowDownIcon } from 'react-native-heroicons/outline/ArrowDownIcon';
 export { default as ArrowLeftOnRectangleIcon } from 'react-native-heroicons/outline/ArrowLeftOnRectangleIcon';
+export { default as ArrowPathIcon } from 'react-native-heroicons/outline/ArrowPathIcon';
 export { default as ArrowUpIcon } from 'react-native-heroicons/outline/ArrowUpIcon';
 export { default as BanknotesIcon } from 'react-native-heroicons/outline/BanknotesIcon';
 export { default as BeakerIcon } from 'react-native-heroicons/outline/BeakerIcon';

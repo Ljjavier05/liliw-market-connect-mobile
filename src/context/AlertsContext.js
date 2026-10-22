@@ -144,7 +144,7 @@ export function AlertsProvider({ children }) {
   const [lowStockCount, setLowStockCount] = useState(0);
 
   useEffect(() => {
-    ensureNotificationPermissions().catch(() => {});
+    ensureNotificationPermissions().catch(() => { });
     SecureStore.getItemAsync(READ_KEYS)
       .then((raw) => setReadKeys(raw ? JSON.parse(raw) : []))
       .catch(() => setReadKeys([]));

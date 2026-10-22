@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -56,7 +56,7 @@ export default function VendorAvailableStallsScreen() {
   const [notes, setNotes] = useState('');
   const [decisionDismissed, setDecisionDismissed] = useState('');
 
-  React.useEffect(() => {
+  useEffect(() => {
     SecureStore.getItemAsync(DISMISS_KEY)
       .then((v) => {
         if (v) setDecisionDismissed(v);

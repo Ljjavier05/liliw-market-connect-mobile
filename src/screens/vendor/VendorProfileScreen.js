@@ -1012,11 +1012,18 @@ export default function VendorProfileScreen({ navigation }) {
 
         <TouchableOpacity
           style={styles.helpBtn}
-          onPress={() => navigation.navigate('Payments')}
+          onPress={() => {
+            const parent = navigation.getParent();
+            if (parent) {
+              parent.navigate('TabRents', { screen: 'VendorRentsList' });
+            } else {
+              navigation.navigate('TabRents');
+            }
+          }}
           activeOpacity={0.85}
         >
           <BanknotesIcon size={18} color={colors.primary} />
-          <Text style={styles.helpBtnText}>Payments</Text>
+          <Text style={styles.helpBtnText}>Stall Rent & Dues</Text>
           <ChevronRightIcon size={16} color={colors.gray300} />
         </TouchableOpacity>
 

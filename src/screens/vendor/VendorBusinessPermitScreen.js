@@ -61,13 +61,6 @@ function isPdf(uriOrName = '') {
   return /\.pdf($|\?)/i.test(String(uriOrName)) || String(uriOrName).includes('application/pdf');
 }
 
-function documentToUploadFile(asset) {
-  if (!asset?.uri) return null;
-  const name = asset.name || 'permit.pdf';
-  const type = asset.mimeType || (isPdf(name) ? 'application/pdf' : 'application/octet-stream');
-  return { uri: asset.uri, name, type };
-}
-
 export default function VendorBusinessPermitScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -178,7 +171,7 @@ export default function VendorBusinessPermitScreen() {
       Alert.alert('File too large', 'Maximum file size is 5 MB.');
       return;
     }
-    setPickedFile(documentToUploadFile(asset));
+    setPickedFile(pickerAssetToUploadFile(asset, 'permit'));
   };
 
   const chooseFile = () => {

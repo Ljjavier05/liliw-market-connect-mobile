@@ -4,6 +4,7 @@
 
 export function targetForNotificationType(type) {
   const t = String(type || '').toUpperCase();
+  if (t.includes('ANNOUNCEMENT')) return 'Announcements';
   if (t.includes('RENT') || t.includes('PAYMENT') || t.includes('RECEIPT')) return 'TabRents';
   if (t.includes('WATER') || t.includes('ELECTRICITY') || t.includes('UTILITY')) return 'UtilityBills';
   if (t.includes('VIOLATION')) return 'TabViolations';

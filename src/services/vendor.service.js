@@ -2,6 +2,7 @@ import { API_BASE_URL } from '../config/env';
 import { getStoredToken } from './api';
 import api from './api';
 import { fetchWithOfflineCache } from '../utils/storageCache';
+import { appendFormDataFile } from '../utils/pickerFile';
 
 /** GET /vendors/me — returns null when profile not created yet (404). */
 export async function getMyVendor() {
@@ -36,12 +37,7 @@ function appendStoreFields(fd, form) {
 
 function appendImageFile(fd, fieldName, file) {
   if (!file?.uri) return;
-  // React Native FormData file part — uri/name/type required for multer
-  fd.append(fieldName, {
-    uri: file.uri,
-    name: file.name || `${fieldName}.jpg`,
-    type: file.type || 'image/jpeg',
-  });
+  appendFormDataFile(fd, fieldName, file, `${fieldName}.jpg`);
 }
 
 /**
@@ -133,8 +129,11 @@ export async function getMyRentsBundle() {
 }
 
 /** POST /stall-rents/:id/proof (multipart) */
-export async function uploadRentProof(rentId, file) {
+export async function uploadRentProof(rentId, file, fields = {}) {
   const fd = new FormData();
+  Object.entries(fields || {}).forEach(([key, value]) => {
+    if (value != null && value !== '') fd.append(key, String(value));
+  });
   appendImageFile(fd, 'proof', file);
   return postMultipart(`/stall-rents/${rentId}/proof`, fd);
 }
@@ -153,10 +152,74 @@ export async function getMyUtilityBills(type) {
 }
 
 /** POST /utility-bills/:id/proof (multipart) */
-export async function uploadUtilityProof(billId, file) {
+export async function uploadUtilityProof(billId, file, fields = {}) {
   const fd = new FormData();
+  Object.entries(fields || {}).forEach(([key, value]) => {
+    if (value != null && value !== '') fd.append(key, String(value));
+  });
   appendImageFile(fd, 'proof', file);
   return postMultipart(`/utility-bills/${billId}/proof`, fd);
+}
+
+/**
+ * Unified fetch for both Stall Rents and Utility Bills (Water & Electricity)
+ * Exactly mirrors the web vendor Stall Rent & Dues module.
+ */
+export async function getMyUnifiedDues() {
+  const [rentsRes, utilitiesRes] = await Promise.all([
+    api.get('/stall-rents/my'),
+    api.get('/utility-bills/my'),
+  ]);
+
+  const rentPayload = rentsRes.data;
+  const rawRents = Array.isArray(rentPayload) ? rentPayload : rentPayload.rents || [];
+  const vendorInfo = rentPayload.vendor || null;
+
+  const utilityPayload = utilitiesRes.data;
+  const rawUtilities = Array.isArray(utilityPayload) ? utilityPayload : utilityPayload.bills || [];
+
+  const normalizedRents = rawRents.map((r) => ({
+    id: r.id,
+    category: 'STALL_RENT',
+    categoryLabel: 'Stall Rent',
+    periodLabel: r.periodLabel,
+    amount: Number(r.amount) || 0,
+    dueDate: r.dueDate,
+    paidDate: r.paidDate,
+    status: r.status,
+    notes: r.notes,
+    proofUrl: r.proofUrl,
+    proofUploadedAt: r.proofUploadedAt,
+    payments: r.payments || [],
+    officialReceipt: r.payments?.[0]?.receipts?.[0] || null,
+    endpoint: `/stall-rents/${r.id}/proof`,
+  }));
+
+  const normalizedUtilities = rawUtilities.map((u) => ({
+    id: u.id,
+    category: u.type, // 'WATER' | 'ELECTRICITY'
+    categoryLabel: u.type === 'WATER' ? 'Water Bill' : 'Electricity Bill',
+    periodLabel: u.periodLabel,
+    amount: Number(u.amount) || 0,
+    dueDate: u.dueDate,
+    paidDate: u.paidDate,
+    status: u.status,
+    notes: u.notes,
+    proofUrl: u.proofUrl,
+    proofUploadedAt: u.proofUploadedAt,
+    payments: u.payments || [],
+    officialReceipt: u.payments?.[0]?.receipts?.[0] || null,
+    endpoint: `/utility-bills/${u.id}/proof`,
+  }));
+
+  const combined = [...normalizedRents, ...normalizedUtilities].sort(
+    (a, b) => new Date(b.dueDate || 0) - new Date(a.dueDate || 0)
+  );
+
+  return {
+    items: combined,
+    vendor: vendorInfo,
+  };
 }
 
 /** GET /payments/my */
@@ -256,11 +319,7 @@ function appendPermitAppFields(fd, fields) {
 
 function appendNamedFile(fd, fieldName, file) {
   if (!file?.uri) return;
-  fd.append(fieldName, {
-    uri: file.uri,
-    name: file.name || `${fieldName}.jpg`,
-    type: file.type || 'image/jpeg',
-  });
+  appendFormDataFile(fd, fieldName, file, `${fieldName}.jpg`);
 }
 
 /** POST /business-permit-applications/my */

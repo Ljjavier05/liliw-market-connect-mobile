@@ -38,7 +38,9 @@
           "color": "#0050d8"
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-sharing",
+      "expo-status-bar"
     ]
   }
 }

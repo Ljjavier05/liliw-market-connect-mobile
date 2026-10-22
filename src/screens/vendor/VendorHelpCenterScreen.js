@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   LayoutAnimation,
   Platform,
-  UIManager,
 } from 'react-native';
 import {
   ArchiveBoxIcon,
@@ -28,10 +27,6 @@ import {
   Squares2X2Icon,
 } from '../../components/icons';
 import { useTheme } from '../../context/ThemeContext';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 const FAQS = [
   {

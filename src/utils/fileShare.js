@@ -1,4 +1,5 @@
-import * as FileSystem from 'expo-file-system';
+import { File as ExpoFile, Paths } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { Alert, Platform } from 'react-native';
 
@@ -25,16 +26,46 @@ export async function shareOrSaveFile(fileUrl, suggestedFilename = 'receipt.jpg'
     }
 
     const cleanFilename = suggestedFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const localUri = `${FileSystem.cacheDirectory}${Date.now()}_${cleanFilename}`;
+    const timestampedName = `${Date.now()}_${cleanFilename}`;
 
-    const downloadRes = await FileSystem.downloadAsync(fileUrl, localUri);
-    if (downloadRes.status < 200 || downloadRes.status >= 300) {
+    let localUri = null;
+
+    // 1. Try modern Expo File API (Expo SDK 54+)
+    try {
+      if (typeof ExpoFile?.downloadFileAsync === 'function' && Paths?.cache) {
+        const destFile = new ExpoFile(Paths.cache, timestampedName);
+        const downloadedFile = await ExpoFile.downloadFileAsync(fileUrl, destFile, { idempotent: true });
+        if (downloadedFile?.uri) {
+          localUri = downloadedFile.uri;
+        }
+      }
+    } catch (modernErr) {
+      console.warn('Modern File.downloadFileAsync failed, trying legacy:', modernErr);
+    }
+
+    // 2. Fallback to Legacy FileSystem API (expo-file-system/legacy)
+    if (!localUri) {
+      try {
+        if (typeof LegacyFileSystem?.downloadAsync === 'function') {
+          const cacheDir = LegacyFileSystem.cacheDirectory || '';
+          const targetUri = `${cacheDir}${timestampedName}`;
+          const downloadRes = await LegacyFileSystem.downloadAsync(fileUrl, targetUri);
+          if (downloadRes?.uri && (downloadRes.status == null || (downloadRes.status >= 200 && downloadRes.status < 300))) {
+            localUri = downloadRes.uri;
+          }
+        }
+      } catch (legacyErr) {
+        console.warn('LegacyFileSystem.downloadAsync failed:', legacyErr);
+      }
+    }
+
+    if (!localUri) {
       Alert.alert('Download error', 'Could not fetch file from the server.');
       return;
     }
 
     const isPdf = cleanFilename.toLowerCase().endsWith('.pdf');
-    await Sharing.shareAsync(downloadRes.uri, {
+    await Sharing.shareAsync(localUri, {
       dialogTitle: `Share / Save ${suggestedFilename}`,
       mimeType: isPdf ? 'application/pdf' : 'image/jpeg',
       UTI: isPdf ? 'com.adobe.pdf' : 'public.jpeg',

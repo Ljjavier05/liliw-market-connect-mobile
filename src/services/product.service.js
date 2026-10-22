@@ -2,6 +2,7 @@ import { API_BASE_URL } from '../config/env';
 import { getStoredToken } from './api';
 import api from './api';
 import { fetchWithOfflineCache } from '../utils/storageCache';
+import { appendFormDataFile } from '../utils/pickerFile';
 
 export async function getCategories() {
   return fetchWithOfflineCache('market_categories', async () => {
@@ -46,11 +47,7 @@ function appendFields(fd, fields) {
 function appendImageFiles(fd, images) {
   (images || []).forEach((file, index) => {
     if (!file?.uri) return;
-    fd.append('images', {
-      uri: file.uri,
-      name: file.name || `product-${index + 1}.jpg`,
-      type: file.type || 'image/jpeg',
-    });
+    appendFormDataFile(fd, 'images', file, `product-${index + 1}.jpg`);
   });
 }
 

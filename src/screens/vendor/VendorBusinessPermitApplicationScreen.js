@@ -61,13 +61,6 @@ function formatDate(v) {
 
 function toUploadFile(asset) {
   if (!asset?.uri) return null;
-  if (asset.mimeType || asset.name) {
-    return {
-      uri: asset.uri,
-      name: asset.name || 'document.pdf',
-      type: asset.mimeType || 'application/pdf',
-    };
-  }
   return pickerAssetToUploadFile(asset, 'document');
 }
 
