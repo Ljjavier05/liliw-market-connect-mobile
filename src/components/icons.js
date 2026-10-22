@@ -38,6 +38,7 @@ export { default as MapPinIcon } from 'react-native-heroicons/outline/MapPinIcon
 export { default as MinusIcon } from 'react-native-heroicons/outline/MinusIcon';
 export { default as MoonIcon } from 'react-native-heroicons/outline/MoonIcon';
 export { default as NoSymbolIcon } from 'react-native-heroicons/outline/NoSymbolIcon';
+export { default as PaperAirplaneIcon } from 'react-native-heroicons/outline/PaperAirplaneIcon';
 export { default as PencilSquareIcon } from 'react-native-heroicons/outline/PencilSquareIcon';
 export { default as PhoneIcon } from 'react-native-heroicons/outline/PhoneIcon';
 export { default as PhotoIcon } from 'react-native-heroicons/outline/PhotoIcon';

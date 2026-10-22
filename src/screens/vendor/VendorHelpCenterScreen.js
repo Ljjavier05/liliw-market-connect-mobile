@@ -24,9 +24,12 @@ import {
   MinusIcon,
   PhoneIcon,
   PlusIcon,
+  SparklesIcon,
   Squares2X2Icon,
 } from '../../components/icons';
+import { AIAvatar } from '../../components/AIIcon';
 import { useTheme } from '../../context/ThemeContext';
+import { lightHaptic } from '../../utils/haptics';
 
 const FAQS = [
   {
@@ -85,6 +88,7 @@ const REMINDERS = [
 ];
 
 const QUICK_LINKS = [
+  { label: 'AI Market Assistant', target: 'AIAssistant', icon: SparklesIcon, nested: true },
   { label: 'Store Profile', target: 'TabProfile', icon: BuildingStorefrontIcon },
   { label: 'Available Stalls', target: 'AvailableStalls', icon: BuildingStorefrontIcon, nested: true },
   { label: 'My Products', target: 'TabProducts', icon: ArchiveBoxIcon },
@@ -159,6 +163,34 @@ export default function VendorHelpCenterScreen({ navigation }) {
           Everything you need to manage your store at Liliw Public Market.
         </Text>
       </View>
+
+      {/* AI Assistant Card */}
+      <TouchableOpacity
+        style={styles.aiCard}
+        onPress={() => {
+          lightHaptic();
+          navigation.navigate('AIAssistant');
+        }}
+        activeOpacity={0.88}
+      >
+        <View style={styles.aiCardLeft}>
+          <AIAvatar size={38} showOnline={true} />
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.aiCardTitle}>Liliw Market AI Assistant</Text>
+              <View style={styles.aiOnlineBadge}>
+                <Text style={styles.aiOnlineBadgeText}>ONLINE</Text>
+              </View>
+            </View>
+            <Text style={styles.aiCardSub}>
+              Ask questions anytime in Tagalog or English about stall rents, violations, permits, or market policies.
+            </Text>
+          </View>
+        </View>
+        <View style={styles.aiCardBtn}>
+          <Text style={styles.aiCardBtnText}>Ask AI →</Text>
+        </View>
+      </TouchableOpacity>
 
       <View style={styles.card}>
         <View style={styles.cardHead}>
@@ -299,6 +331,68 @@ const createStyles = (colors) =>
     },
     heroTitle: { fontSize: 18, fontWeight: '800', color: colors.gray900 },
     heroSub: { fontSize: 13, color: colors.gray500, marginTop: 4, lineHeight: 18 },
+
+    aiCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 12,
+      borderWidth: 1.5,
+      borderColor: colors.primaryLight ? `${colors.primaryLight}60` : '#bae6fd',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    aiCardLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+      marginRight: 8,
+    },
+    aiCardTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.gray900,
+    },
+    aiOnlineBadge: {
+      backgroundColor: '#ecfdf5',
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 8,
+      borderWidth: 0.5,
+      borderColor: '#a7f3d0',
+    },
+    aiOnlineBadgeText: {
+      fontSize: 9,
+      fontWeight: '800',
+      color: '#059669',
+      letterSpacing: 0.4,
+    },
+    aiCardSub: {
+      fontSize: 12,
+      color: colors.gray500,
+      marginTop: 2,
+      lineHeight: 16,
+    },
+    aiCardBtn: {
+      backgroundColor: colors.primaryLight ? `${colors.primaryLight}30` : '#e0f2fe',
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.primary,
+    },
+    aiCardBtnText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: colors.primary,
+    },
 
     card: {
       backgroundColor: colors.surface,

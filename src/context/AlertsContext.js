@@ -240,6 +240,15 @@ export function AlertsProvider({ children }) {
     });
   }, []);
 
+  const markUnread = useCallback(async (key) => {
+    if (!key) return;
+    setReadKeys((prev) => {
+      const next = prev.filter((k) => k !== key);
+      SecureStore.setItemAsync(READ_KEYS, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
   const markAllRead = useCallback(
     async (keys) => {
       const toMark = Array.isArray(keys) ? keys : alerts.map((a) => a.key);
@@ -252,6 +261,11 @@ export function AlertsProvider({ children }) {
     },
     [alerts]
   );
+
+  const markAllUnread = useCallback(async () => {
+    setReadKeys([]);
+    SecureStore.setItemAsync(READ_KEYS, JSON.stringify([]));
+  }, []);
 
   /** Clear Violations tab badge — vendor already opened the list */
   const markViolationsSeen = useCallback(async () => {
@@ -271,7 +285,9 @@ export function AlertsProvider({ children }) {
       lowStockCount,
       refresh,
       markRead,
+      markUnread,
       markAllRead,
+      markAllUnread,
       markViolationsSeen,
       isRead: (key) => readKeys.includes(key),
     }),
@@ -285,7 +301,9 @@ export function AlertsProvider({ children }) {
       lowStockCount,
       refresh,
       markRead,
+      markUnread,
       markAllRead,
+      markAllUnread,
       markViolationsSeen,
       readKeys,
     ]

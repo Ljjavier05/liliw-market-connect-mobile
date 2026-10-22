@@ -18,6 +18,8 @@ import PricingInsightsScreen from '../screens/vendor/PricingInsightsScreen';
 import AlertsScreen from '../screens/vendor/AlertsScreen';
 import VendorHelpCenterScreen from '../screens/vendor/VendorHelpCenterScreen';
 import VendorAnnouncementsScreen from '../screens/vendor/VendorAnnouncementsScreen';
+import AIAssistantScreen from '../screens/vendor/AIAssistantScreen';
+import { AIIcon } from '../components/AIIcon';
 import { AlertsProvider, useAlerts } from '../context/AlertsContext';
 import { consumePendingTab } from './pendingRoute';
 import { useTheme } from '../context/ThemeContext';
@@ -76,6 +78,29 @@ function AlertsBell({ navigation }) {
   );
 }
 
+function AIAssistantHeaderBtn({ navigation }) {
+  const { colors } = useTheme();
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        lightHaptic();
+        navigation.navigate('AIAssistant');
+      }}
+      style={{
+        marginRight: 8,
+        padding: 4,
+        borderRadius: 8,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      hitSlop={10}
+      accessibilityLabel="Open AI Assistant"
+    >
+      <AIIcon size={22} variant="gradient" />
+    </TouchableOpacity>
+  );
+}
+
 function DashboardHeaderTitle() {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -99,8 +124,18 @@ function DashboardStack() {
         options={({ navigation }) => ({
           headerTitle: () => <DashboardHeaderTitle />,
           headerTitleAlign: 'left',
-          headerRight: () => <AlertsBell navigation={navigation} />,
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <AIAssistantHeaderBtn navigation={navigation} />
+              <AlertsBell navigation={navigation} />
+            </View>
+          ),
         })}
+      />
+      <Stack.Screen
+        name="AIAssistant"
+        component={AIAssistantScreen}
+        options={{ title: 'AI Assistant' }}
       />
       <Stack.Screen
         name="PricingInsights"
@@ -203,6 +238,11 @@ function ProfileStack() {
         options={{ title: 'Profile' }}
       />
       <Stack.Screen
+        name="AIAssistant"
+        component={AIAssistantScreen}
+        options={{ title: 'AI Assistant' }}
+      />
+      <Stack.Screen
         name="HelpCenter"
         component={VendorHelpCenterScreen}
         options={{ title: 'Help Center' }}
@@ -273,6 +313,8 @@ function VendorTabs() {
         navigation.navigate('TabDashboard', { screen: 'BusinessPermitApplication' });
       } else if (target === 'Alerts') {
         navigation.navigate('TabDashboard', { screen: 'Alerts' });
+      } else if (target === 'AIAssistant') {
+        navigation.navigate('TabDashboard', { screen: 'AIAssistant' });
       } else {
         navigation.navigate(target);
       }

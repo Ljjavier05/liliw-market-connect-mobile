@@ -24,6 +24,8 @@ import LoadingScreen from '../../components/LoadingScreen';
 import StoreAvatar from '../../components/StoreAvatar';
 import { useAlertsOptional } from '../../context/AlertsContext';
 import { useTheme } from '../../context/ThemeContext';
+import { AIAvatar } from '../../components/AIIcon';
+import { lightHaptic } from '../../utils/haptics';
 import {
   ArchiveBoxIcon,
   BanknotesIcon,
@@ -35,6 +37,7 @@ import {
   ClipboardDocumentIcon,
   ExclamationTriangleIcon,
   MegaphoneIcon,
+  SparklesIcon,
 } from '../../components/icons';
 
 function insightStatus(row, colors) {
@@ -377,6 +380,32 @@ export default function VendorDashboardScreen({ navigation }) {
             </View>
           )}
 
+          {/* AI Assistant Banner */}
+          <TouchableOpacity
+            style={styles.aiBannerCard}
+            onPress={() => {
+              lightHaptic();
+              navigation.navigate('AIAssistant');
+            }}
+            activeOpacity={0.88}
+          >
+            <View style={styles.aiBannerLeft}>
+              <AIAvatar size={38} showOnline={true} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={styles.aiBannerTitle}>Liliw Market AI</Text>
+                  <View style={styles.aiOnlineTag}>
+                    <Text style={styles.aiOnlineTagText}>ASSISTANT</Text>
+                  </View>
+                </View>
+                <Text style={styles.aiBannerSub} numberOfLines={2}>
+                  Need help with stall rent, permits, or market policies? Ask questions instantly.
+                </Text>
+              </View>
+            </View>
+            <ChevronRightIcon size={18} color={colors.primary} />
+          </TouchableOpacity>
+
           {vendor.status === 'APPROVED' ? (
             <>
               <Text style={styles.sectionTitle}>Store overview</Text>
@@ -475,6 +504,25 @@ export default function VendorDashboardScreen({ navigation }) {
                 <Text style={[styles.panelTitle, { marginBottom: 4 }]}>Market desk</Text>
                 <TouchableOpacity
                   style={[styles.quickLink, { borderTopWidth: 0 }]}
+                  onPress={() => {
+                    lightHaptic();
+                    navigation.navigate('AIAssistant');
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <SparklesIcon size={18} color={colors.primary} />
+                  <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={[styles.quickLinkText, { fontWeight: '700' }]}>
+                      AI Market Assistant
+                    </Text>
+                    <View style={styles.aiBadge}>
+                      <Text style={styles.aiBadgeText}>AI</Text>
+                    </View>
+                  </View>
+                  <ChevronRightIcon size={16} color={colors.gray300} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickLink}
                   onPress={() => navigation.navigate('Announcements')}
                   activeOpacity={0.85}
                 >
@@ -853,4 +901,64 @@ const createStyles = (colors) =>
     rangeHint: { fontSize: 11, color: colors.primary, marginTop: 2, fontWeight: '600' },
     insightBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
     insightBadgeText: { fontSize: 11, fontWeight: '700' },
+
+    aiBannerCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1.5,
+      borderColor: colors.primaryLight ? `${colors.primaryLight}50` : '#bae6fd',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.08,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    aiBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+      marginRight: 8,
+    },
+    aiBannerTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: colors.gray900,
+    },
+    aiOnlineTag: {
+      backgroundColor: '#ecfdf5',
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 8,
+      borderWidth: 0.5,
+      borderColor: '#a7f3d0',
+    },
+    aiOnlineTagText: {
+      fontSize: 9,
+      fontWeight: '800',
+      color: '#059669',
+      letterSpacing: 0.4,
+    },
+    aiBannerSub: {
+      fontSize: 12,
+      color: colors.gray500,
+      marginTop: 2,
+      lineHeight: 16,
+    },
+    aiBadge: {
+      backgroundColor: '#38bdf8',
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+      borderRadius: 6,
+    },
+    aiBadgeText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: '#ffffff',
+    },
   });
