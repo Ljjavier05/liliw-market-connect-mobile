@@ -43,7 +43,7 @@ function appendFields(fd, fields) {
   });
 }
 
-/** Backend expects multer field name `images` (up to 5). */
+/** Backend expects multer field name `images` (up to 9). */
 function appendImageFiles(fd, images) {
   (images || []).forEach((file, index) => {
     if (!file?.uri) return;

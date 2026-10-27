@@ -51,7 +51,7 @@ import {
 import { uploadUrl } from '../../utils/media';
 import { useTheme } from '../../context/ThemeContext';
 
-const MAX_PRODUCT_IMAGES = 5;
+const MAX_PRODUCT_IMAGES = 9;
 
 const PRICE_UNITS = [
   { value: 'PIECE', label: 'Piece' },
